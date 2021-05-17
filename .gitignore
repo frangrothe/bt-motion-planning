@@ -1,2 +1,4 @@
 /.idea/
-/cmake-build-debug/
+/data/
+/src/cmake-build-debug/
+/visualization/.idea/
