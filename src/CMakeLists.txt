@@ -16,5 +16,5 @@ link_libraries(${LIBRARIES})
 include_directories(ToyExamples)
 
 
-add_executable(bt_robotics main.cpp ToyExamples/RigidBody3D.h ToyExamples/RigidBody3D.cpp ToyExamples/Time1D.cpp ToyExamples/Time1D.h auxillary.cpp auxillary.h)
+add_executable(bt_robotics main.cpp ToyExamples/RigidBody3D.h ToyExamples/RigidBody3D.cpp auxillary.cpp auxillary.h ToyExamples/Time1DPlanner.cpp ToyExamples/Time1DPlanner.h ToyExamples/Time1DStateValidityChecker.cpp ToyExamples/Time1DStateValidityChecker.h ToyExamples/structs/Constraint.h ToyExamples/Time1DMotionValidator.cpp ToyExamples/Time1DMotionValidator.h ToyExamples/Time1DGoal.cpp ToyExamples/Time1DGoal.h)
 
