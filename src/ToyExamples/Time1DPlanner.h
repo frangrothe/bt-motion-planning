@@ -12,12 +12,16 @@
 #include <ompl/base/spaces/RealVectorStateSpace.h>
 #include <ompl/base/spaces/TimeStateSpace.h>
 #include <ompl/base/SpaceInformation.h>
+#include <ompl/base/goals/GoalSpace.h>
 #include "ompl/geometric/planners/rrt/RRT.h"
+#include "ompl/geometric/planners/rrt/RRTConnect.h"
+
 
 #include "Time1DStateValidityChecker.h"
 #include "Time1DMotionValidator.h"
-#include "Time1DGoal.h"
+#include "Time1DGoalRegion.h"
 #include "structs/Constraint.h"
+#include "planner/TimeRRT.h"
 
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
@@ -37,20 +41,25 @@ private:
     double timeBoundHigh_ = 2.5;
 
     double xStart_ = 0.0;
-    double xGoal_ = 1.0;
+    double xGoalRegionLeft_ = 1.0;
+    double xGoalRegionRight_ = 1.1;
+    double minTime_ = 0.0; // minimum time for the goal to be able to be reached. Calculated during planning
 
     std::vector<Constraint> constraints_ {
             {0.4, 0.8, 0.8, 1.2},
             {0.05, 0.15, 0.3, 0.6}
     };
     double maxSpeed_ = 1.0; // 1 m/s
-    double goalBias_ = 0.05; // [0, 1] probability that the goal is sampled
-    double solveTime_ = 2.0; // in seconds
+    double solveTime_ = 1.0; // in seconds
+    double plannerRange_ = 0.5;
 
     std::string filename_;
+    std::string csvDelim_ = ",";
 
-    void writeResultToCSV(const ob::PlannerData &data);
+    void writeSamplesToCSV(const ob::PlannerData &data);
+    void writePathToCSV(const ob::PathPtr &);
     void writeConstraintsToCSV();
+    void writeGoalRegionToCSV();
 
 };
 }

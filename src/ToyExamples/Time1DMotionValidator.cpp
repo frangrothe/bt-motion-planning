@@ -17,15 +17,15 @@ bool Time1DMotionValidator::checkMotion(const ob::State *s1, const ob::State *s2
     }
 
     /*
-     * Check if motion is going into the right direction, forward in time and is not exceeding the speed limit
+     * Check if motion is forward in time and is not exceeding the speed limit
      */
-    auto deltaX = s2->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0]
-                  - s1->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
+    auto deltaX = abs(s2->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0]
+                  - s1->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0]);
 
     auto deltaT = s2->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position
                   - s1->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
 
-    if (!(deltaT > 0 && deltaX > 0 && deltaX / deltaT <= maxSpeed_)) {
+    if (!(deltaT > 0 && deltaX / deltaT <= maxSpeed_)) {
         invalid_++;
         return false;
     }
