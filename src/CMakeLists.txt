@@ -16,5 +16,22 @@ link_libraries(${LIBRARIES})
 include_directories(ToyExamples)
 
 
-add_executable(bt_robotics main.cpp ToyExamples/RigidBody3D.h ToyExamples/RigidBody3D.cpp auxillary.cpp auxillary.h ToyExamples/Time1DPlanner.cpp ToyExamples/Time1DPlanner.h ToyExamples/Time1DStateValidityChecker.cpp ToyExamples/Time1DStateValidityChecker.h ToyExamples/Time1DMotionValidator.cpp ToyExamples/Time1DMotionValidator.h ToyExamples/Time1DGoal.cpp ToyExamples/Time1DGoal.h ToyExamples/Time1DGoalRegion.cpp ToyExamples/Time1DGoalRegion.h ToyExamples/Time1DValidStateSampler.cpp ToyExamples/Time1DValidStateSampler.h ToyExamples/planner/TimeRRT.cpp ToyExamples/planner/TimeRRT.h SpaceTimePlanning/SpaceTimePlanner.cpp SpaceTimePlanning/SpaceTimePlanner.h SpaceTimePlanning/spaces/AnimationTimeStateSpace.cpp SpaceTimePlanning/spaces/AnimationTimeStateSpace.h SpaceTimePlanning/spaces/AnimationStateSpace.cpp SpaceTimePlanning/spaces/AnimationStateSpace.h SpaceTimePlanning/SpaceTimeStateValidityChecker.cpp SpaceTimePlanning/SpaceTimeStateValidityChecker.h SpaceTimePlanning/SpaceTimeMotionValidator.cpp SpaceTimePlanning/SpaceTimeMotionValidator.h structs/Constraint.h SpaceTimePlanning/goals/SpaceTimeSampler.cpp SpaceTimePlanning/goals/SpaceTimeSampler.h SpaceTimePlanning/goals/SpaceTimeGoalRegion.cpp SpaceTimePlanning/goals/SpaceTimeGoalRegion.h)
+add_executable(bt_robotics
+        main.cpp
+        ToyExamples/RigidBody3D.h ToyExamples/RigidBody3D.cpp
+        auxillary.cpp auxillary.h
+        ToyExamples/Time1DPlanner.cpp ToyExamples/Time1DPlanner.h
+        ToyExamples/Time1DStateValidityChecker.cpp ToyExamples/Time1DStateValidityChecker.h
+        ToyExamples/Time1DMotionValidator.cpp ToyExamples/Time1DMotionValidator.h
+        ToyExamples/Time1DGoal.cpp ToyExamples/Time1DGoal.h
+        ToyExamples/Time1DGoalRegion.cpp ToyExamples/Time1DGoalRegion.h
+        ToyExamples/Time1DValidStateSampler.cpp ToyExamples/Time1DValidStateSampler.h
+        ToyExamples/planner/TimeRRT.cpp ToyExamples/planner/TimeRRT.h
+        SpaceTimePlanning/SpaceTimePlanner.cpp SpaceTimePlanning/SpaceTimePlanner.h
+        SpaceTimePlanning/spaces/AnimationStateSpace.cpp SpaceTimePlanning/spaces/AnimationStateSpace.h
+        SpaceTimePlanning/SpaceTimeStateValidityChecker.cpp SpaceTimePlanning/SpaceTimeStateValidityChecker.h
+        SpaceTimePlanning/SpaceTimeMotionValidator.cpp SpaceTimePlanning/SpaceTimeMotionValidator.h
+        structs/Constraint.h
+        SpaceTimePlanning/goals/SpaceTimeSampler.cpp SpaceTimePlanning/goals/SpaceTimeSampler.h
+        SpaceTimePlanning/goals/SpaceTimeGoalRegion.cpp SpaceTimePlanning/goals/SpaceTimeGoalRegion.h)
 

@@ -17,12 +17,6 @@ AnimationStateSpace::AnimationStateSpace(unsigned int dim, double vMax, double t
 }
 
 double AnimationStateSpace::distance(const ompl::base::State *state1, const ompl::base::State *state2) const {
-    if (state1->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position >
-        state2->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position)
-    {
-        return std::numeric_limits<double>::infinity();
-    }
-
     double deltaSpace = distanceSpace(state1, state2);
     double deltaTime = distanceTime(state1, state2);
 
