@@ -1,36 +1,34 @@
 //
-// Created by francesco on 19.05.21.
+// Created by francesco on 27.05.21.
 //
 
-#ifndef BT_ROBOTICS_TIME1DPLANNER_H
-#define BT_ROBOTICS_TIME1DPLANNER_H
+#ifndef BT_ROBOTICS_SPACETIMEPLANNER_H
+#define BT_ROBOTICS_SPACETIMEPLANNER_H
 
 #include <vector>
 #include <iostream>
 #include <fstream>
 
-#include <ompl/base/spaces/RealVectorStateSpace.h>
-#include <ompl/base/spaces/TimeStateSpace.h>
 #include <ompl/base/SpaceInformation.h>
+#include <ompl/base/ProblemDefinition.h>
 #include <ompl/base/goals/GoalSpace.h>
-#include "ompl/geometric/planners/rrt/RRT.h"
-#include "ompl/geometric/planners/rrt/RRTConnect.h"
+#include <ompl/geometric/planners/rrt/RRTConnect.h>
 
-
-#include "Time1DStateValidityChecker.h"
-#include "Time1DMotionValidator.h"
-#include "Time1DGoalRegion.h"
 #include "../structs/Constraint.h"
-#include "planner/TimeRRT.h"
+#include "../auxillary.h"
+#include "spaces/AnimationStateSpace.h"
+#include "SpaceTimeStateValidityChecker.h"
+#include "SpaceTimeMotionValidator.h"
+#include "goals/SpaceTimeGoalRegion.h"
 
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
-namespace t1d {
+namespace SpaceTime {
 
-class Time1DPlanner {
+class SpaceTimePlanner {
 
 public:
-    explicit Time1DPlanner(std::string filename);
+    explicit SpaceTimePlanner(std::string filename);
 
     void planMotion();
 
@@ -49,17 +47,11 @@ private:
             {0.4, 0.8, 0.8, 1.2},
             {0.05, 0.15, 0.3, 0.6}
     };
-    double maxSpeed_ = 1.0; // 1 m/s
+    double vMax_ = 1.0; // 1 m/s
     double solveTime_ = 1.0; // in seconds
     double plannerRange_ = 0.5;
 
     std::string filename_;
-    std::string csvDelim_ = ",";
-
-    void writeSamplesToCSV(const ob::PlannerData &data);
-    void writePathToCSV(const ob::PathPtr &);
-    void writeConstraintsToCSV();
-    void writeGoalRegionToCSV();
 
 };
 }
@@ -67,4 +59,4 @@ private:
 
 
 
-#endif //BT_ROBOTICS_TIME1DPLANNER_H
+#endif //BT_ROBOTICS_SPACETIMEPLANNER_H

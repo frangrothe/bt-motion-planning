@@ -47,8 +47,8 @@ void Time1DPlanner::planMotion() {
     pdef->setGoal(std::make_shared<Time1DGoalRegion>(si, xGoalRegionLeft_, xGoalRegionRight_, minTime_, timeBoundHigh_));
 
     //(3) Planner
-//    auto planner(std::make_shared<og::RRTConnect>(si, true));
-    auto planner(std::make_shared<TimeRRT>(si, maxSpeed_));
+    auto planner(std::make_shared<og::RRTConnect>(si));
+//    auto planner(std::make_shared<TimeRRT>(si, maxSpeed_));
     planner->setRange(plannerRange_);
     planner->setProblemDefinition(pdef);
     planner->setup();

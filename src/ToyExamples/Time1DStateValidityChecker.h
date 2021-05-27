@@ -9,7 +9,7 @@
 #include <ompl/base/spaces/RealVectorStateSpace.h>
 #include <ompl/base/spaces/TimeStateSpace.h>
 
-#include "structs/Constraint.h"
+#include "../structs/Constraint.h"
 
 namespace ob = ompl::base;
 namespace t1d {
