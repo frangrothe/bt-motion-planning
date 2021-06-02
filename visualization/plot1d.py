@@ -88,4 +88,9 @@ if __name__ == '__main__':
 
     plot_motion_plan(filename)
 
+    # s = "#3#4#5"
+    # s = [x for x in s.split('#') if x]
+    # print(s)
+
+
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/

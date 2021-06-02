@@ -11,37 +11,32 @@ SpaceTimePlanner::SpaceTimePlanner(std::string filename) : filename_(std::move(f
 void SpaceTimePlanner::planMotion() {
 
     //(1) Define State Space
-    auto space = std::make_shared<AnimationStateSpace>(1);
+    auto space = std::make_shared<AnimationStateSpace>(2);
     // Set the bounds
-    ob::RealVectorBounds bounds(1);
-    bounds.setLow(xBoundLow_);
-    bounds.setHigh(xBoundHigh_);
+    ob::RealVectorBounds bounds(2);
+    bounds.setLow(0, xBoundLow_);
+    bounds.setHigh(0, xBoundHigh_);
+    bounds.setLow(1, yBoundLow_);
+    bounds.setHigh(1, yBoundHigh_);
     space->setVectorBounds(bounds);
     space->setTimeBounds(timeBoundLow_, timeBoundHigh_);
-//
-//    auto r1State(std::make_shared<ob::RealVectorStateSpace>(1));
-//    auto timeState(std::make_shared<ob::TimeStateSpace>());
-//    auto space = r1State + timeState;
-//
-//    // Set the bounds for R1
-//    ob::RealVectorBounds bounds(1);
-//    bounds.setLow(xBoundLow_);
-//    bounds.setHigh(xBoundHigh_);
-//    r1State->setBounds(bounds);
-//    timeState->setBounds(timeBoundLow_, timeBoundHigh_);
+    for (auto &c : constraints_) {
+        c.setBounds(xBoundLow_, xBoundHigh_, yBoundLow_, yBoundHigh_);
+    }
 
     ob::SpaceInformationPtr si = std::make_shared<ob::SpaceInformation>(space);
     si->setStateValidityChecker(std::make_shared<SpaceTimeStateValidityChecker>(si, constraints_));
-    si->setMotionValidator(std::make_shared<SpaceTimeMotionValidator>(si, vMax_));
+    si->setMotionValidator(std::make_shared<SpaceTimeMotionValidator>(si, 2, vMax_));
 
     //(2) Problem Definition Ptr
     auto pdef(std::make_shared<ob::ProblemDefinition>(si));
     ob::ScopedState<> start(space);
     start[0] = xStart_; // r1State
+    start[1] = yStart_;
 
-    minTime_ = (xGoalRegionLeft_ - xStart_) / vMax_; // minimum time at which the goal can be reached
+    minTime_ = sqrt(pow(fabs(xGoal_ - xStart_), 2) + pow(fabs(yGoal_ - yStart_), 2)) / vMax_; // minimum time at which the goal can be reached
     pdef->addStartState(start);
-    pdef->setGoal(std::make_shared<SpaceTimeGoalRegion>(si, xGoalRegionLeft_, xGoalRegionRight_, minTime_, timeBoundHigh_));
+    pdef->setGoal(std::make_shared<SpaceTimeGoalRegion>(si, xGoal_, yGoal_, minTime_, timeBoundHigh_));
 
     //(3) Planner
     auto planner(std::make_shared<og::RRTConnect>(si));
@@ -67,13 +62,19 @@ void SpaceTimePlanner::planMotion() {
         std::cout << "\nExact Solution: " << (pdef->hasExactSolution()? "yes" : "no");
         std::cout << "\nApproximate Solution: " << (pdef->hasApproximateSolution()? "yes" : "no") << std::endl;
 
-        auxillary::writeSamplesToCSV(data, filename_);
-        auxillary::writePathToCSV(path, filename_);
-        auxillary::writeConstraintsToCSV(constraints_, filename_);
-        auxillary::writeGoalRegionToCSV(xGoalRegionLeft_, xGoalRegionRight_, minTime_, timeBoundHigh_, filename_);
+        auxillary::writeSamplesToCSV2D(data, filename_);
+        auxillary::writePathToCSV2D(path, filename_);
+        auxillary::writeConstraintsToJSON(constraints_, filename_);
+        auxillary::writeGoalToCSV2D(xGoal_, yGoal_, timeBoundLow_, timeBoundHigh_, filename_);
+//        auxillary::writePathToCSV1D(path, filename_);
+//        auxillary::writeConstraintsToCSV(constraints_, filename_);
+//        auxillary::writeGoalRegionToCSV1D(xGoalRegionLeft_, xGoalRegionRight_, minTime_, timeBoundHigh_, filename_);
     }
     else
         std::cout << "No solution found" << std::endl;
 
+}
+
+void SpaceTimePlanner::test() {
 }
 }

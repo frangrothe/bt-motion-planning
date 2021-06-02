@@ -4,6 +4,7 @@
 #include "SpaceTimePlanning/SpaceTimePlanner.h"
 
 #include "auxillary.h"
+#include "structs/Constraint2D.h"
 
 int main(int argc, char* argv[]) {
 
@@ -21,6 +22,7 @@ int main(int argc, char* argv[]) {
 //    t1d::Time1DPlanner planner{filename};
     SpaceTime::SpaceTimePlanner planner{filename};
     planner.planMotion();
+//    planner.test();
 
     return 0;
 }

@@ -6,15 +6,16 @@
 
 namespace SpaceTime {
 
-SpaceTimeSampler::SpaceTimeSampler(const ompl::base::SpaceInformation *si, double minX,
-                                                         double maxX, double minTime, double maxTime)
-        : ValidStateSampler(si), minX_(minX), maxX_(maxX), minTime_(minTime), maxTime_(maxTime) {}
+SpaceTimeSampler::SpaceTimeSampler(const ompl::base::SpaceInformation *si, double x,
+                                                         double y, double minTime, double maxTime)
+        : ValidStateSampler(si), x_(x), y_(y), minTime_(minTime), maxTime_(maxTime) {}
 
 bool SpaceTimeSampler::sample(ompl::base::State *state) {
-    double x = rng_.uniformReal(minX_,maxX_);
+
     double t = rng_.uniformReal(minTime_,maxTime_);
 
-    state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0] = x;
+    state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0] = x_;
+    state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[1] = y_;
     state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position = t;
     return true;
 }

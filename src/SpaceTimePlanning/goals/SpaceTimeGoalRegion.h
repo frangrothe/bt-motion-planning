@@ -19,7 +19,7 @@ namespace SpaceTime {
 class SpaceTimeGoalRegion : public ob::GoalSampleableRegion {
 
 public:
-    SpaceTimeGoalRegion(const ompl::base::SpaceInformationPtr &si, double minX, double maxX, double minTime,
+    SpaceTimeGoalRegion(const ompl::base::SpaceInformationPtr &si, double x, double y, double minTime,
                         double maxTime);
 
     void sampleGoal(ob::State *st) const override;
@@ -27,11 +27,10 @@ public:
     double distanceGoal(const ob::State *st) const override;
 
 private:
-    double minX_;
-    double maxX_;
+    double x_;
+    double y_;
     double minTime_;
     double maxTime_;
-    double granularityX_ = 0.01; // only used to calculate max sample count
     double granularityTime_ = 0.01; // only used to calculate max sample count
 
     mutable SpaceTimeSampler sampler_; // Valid State Sampler to sample goal states

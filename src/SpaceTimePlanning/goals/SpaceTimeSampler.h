@@ -18,7 +18,7 @@ namespace SpaceTime {
 class SpaceTimeSampler : public ob::ValidStateSampler  {
 
 public:
-    SpaceTimeSampler(const ompl::base::SpaceInformation *si, double minX, double maxX, double minTime,
+    SpaceTimeSampler(const ompl::base::SpaceInformation *si, double x, double y, double minTime,
                                 double maxTime);
 
     bool sample(ompl::base::State *state) override;
@@ -28,8 +28,8 @@ protected:
     ompl::RNG rng_;
 
 private:
-    double minX_;
-    double maxX_;
+    double x_;
+    double y_;
     double minTime_;
     double maxTime_;
 };

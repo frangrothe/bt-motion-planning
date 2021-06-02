@@ -14,7 +14,7 @@
 #include <ompl/base/goals/GoalSpace.h>
 #include <ompl/geometric/planners/rrt/RRTConnect.h>
 
-#include "../structs/Constraint.h"
+#include "../structs/Constraint2D.h"
 #include "../auxillary.h"
 #include "spaces/AnimationStateSpace.h"
 #include "SpaceTimeStateValidityChecker.h"
@@ -31,22 +31,52 @@ public:
     explicit SpaceTimePlanner(std::string filename);
 
     void planMotion();
+    void test();
 
 private:
     double xBoundLow_ = 0.0;
     double xBoundHigh_ = 2.0;
+    double yBoundLow_ = 0.0;
+    double yBoundHigh_ = 2.0;
     double timeBoundLow_ = 0.0;
     double timeBoundHigh_ = 2.5;
 
     double xStart_ = 0.0;
-    double xGoalRegionLeft_ = 1.0;
-    double xGoalRegionRight_ = 1.1;
+    double yStart_ = 0.0;
+    double xGoal_ = 1.0;
+    double yGoal_ = 1.0;
     double minTime_ = 0.0; // minimum time for the goal to be able to be reached. Calculated during planning
 
-    std::vector<Constraint> constraints_ {
-            {0.4, 0.8, 0.8, 1.2},
-            {0.05, 0.15, 0.3, 0.6}
+//    std::vector<Constraint> constraints_ {
+//            {0.4, 0.8, 0.8, 1.2},
+//            {0.05, 0.15, 0.3, 0.6}
+//    };
+
+    std::vector<Constraint2D> constraints_{
+            // Movement between x = 0 and x = 1
+            {[](double x, double y, double t) {
+                x = x + 0.5 * sin(t * M_PI);
+                return std::make_tuple(x, y);
+            }, 0.5,  1.0,  0.1,  0.1},
+
+            // Static obstacle
+            {[](double x, double y, double t) {
+                return std::make_tuple(x, y);
+            }, 0.35, 0.35, 0.25, 0.35}
     };
+
+//    // constant acceleration movement
+//    {[](double x, double y, double t) {
+//            double u = -0.1; // initial velocity
+//            double a = -0.15; // constant acceleration
+//            return std::make_tuple(x + u * t + 0.5 * a * t * t, y + u * t + 0.5 * a * t * t);
+//        }, 0.3, 0.6, 0.1, 0.1},
+//
+//    // Movement between x = 0 and x = 1
+//    {[](double x, double y, double t) {
+//            x = x + 0.5 * sin(t * M_PI);
+//            return std::make_tuple(x, y);
+//        }, 0.5, 1.0, 0.1, 0.1},
     double vMax_ = 1.0; // 1 m/s
     double solveTime_ = 1.0; // in seconds
     double plannerRange_ = 0.5;

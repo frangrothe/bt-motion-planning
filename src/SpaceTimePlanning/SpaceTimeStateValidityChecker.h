@@ -13,7 +13,7 @@
 #include <ompl/base/spaces/RealVectorStateSpace.h>
 #include <ompl/base/spaces/TimeStateSpace.h>
 
-#include "../structs/Constraint.h"
+#include "../structs/Constraint2D.h"
 
 namespace ob = ompl::base;
 namespace SpaceTime {
@@ -23,12 +23,12 @@ public:
     explicit SpaceTimeStateValidityChecker(const ompl::base::SpaceInformationPtr &si);
 
     SpaceTimeStateValidityChecker(const ompl::base::SpaceInformationPtr &si,
-                                  std::vector<Constraint> constraints);
+                                  std::vector<Constraint2D> constraints);
 
     bool isValid(const ompl::base::State *state) const override;
 
 private:
-    std::vector<Constraint> constraints_;
+    std::vector<Constraint2D> constraints_;
 };
 }
 

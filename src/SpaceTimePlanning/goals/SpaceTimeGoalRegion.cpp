@@ -7,26 +7,24 @@
 namespace SpaceTime {
 
 
-SpaceTimeGoalRegion::SpaceTimeGoalRegion(const ompl::base::SpaceInformationPtr &si, double minX, double maxX,
-                                         double minTime, double maxTime) : GoalSampleableRegion(si), minX_(minX),
-                                                                           maxX_(maxX), minTime_(minTime),
+SpaceTimeGoalRegion::SpaceTimeGoalRegion(const ompl::base::SpaceInformationPtr &si, double x, double y,
+                                         double minTime, double maxTime) : GoalSampleableRegion(si), x_(x),
+                                                                           y_(y), minTime_(minTime),
                                                                            maxTime_(maxTime),
-                                                                           sampler_(&(*si), minX, maxX, minTime, maxTime) {}
+                                                                           sampler_(&(*si), x, y, minTime, maxTime) {}
 
 void SpaceTimeGoalRegion::sampleGoal(ob::State *st) const {
     sampler_.sample(st);
 }
 
 unsigned int SpaceTimeGoalRegion::maxSampleCount() const {
-    int nXSamples = (int) ((maxX_ - minX_) / granularityX_);
-    int nTimeSamples = (int) ((maxTime_ - minTime_) / granularityTime_);
-    return nXSamples * nTimeSamples;
+    return (int) ((maxTime_ - minTime_) / granularityTime_);
 }
 
 double SpaceTimeGoalRegion::distanceGoal(const ob::State *st) const {
-    double deltaX = minX_ - st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
-    return deltaX > 0 ? deltaX : 0.0;
+    double deltaX = fabs(x_- st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0]);
+    double deltaY = fabs(y_- st->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[1]);
+
+    return sqrt(pow(deltaX, 2) + pow(deltaY, 2));
 }
-
-
 }

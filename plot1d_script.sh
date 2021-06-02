@@ -7,5 +7,5 @@ cd src/cmake-build-debug
 make
 cd ../..
 src/cmake-build-debug/bt_robotics "$stored_date"
-python3 visualization/plot.py "$stored_date"
+python3 visualization/plot1d.py "$stored_date"
 

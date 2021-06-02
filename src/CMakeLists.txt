@@ -32,6 +32,7 @@ add_executable(bt_robotics
         SpaceTimePlanning/SpaceTimeStateValidityChecker.cpp SpaceTimePlanning/SpaceTimeStateValidityChecker.h
         SpaceTimePlanning/SpaceTimeMotionValidator.cpp SpaceTimePlanning/SpaceTimeMotionValidator.h
         structs/Constraint.h
+        structs/Constraint2D.h
         SpaceTimePlanning/goals/SpaceTimeSampler.cpp SpaceTimePlanning/goals/SpaceTimeSampler.h
-        SpaceTimePlanning/goals/SpaceTimeGoalRegion.cpp SpaceTimePlanning/goals/SpaceTimeGoalRegion.h)
+        SpaceTimePlanning/goals/SpaceTimeGoalRegion.cpp SpaceTimePlanning/goals/SpaceTimeGoalRegion.h json.h)
 

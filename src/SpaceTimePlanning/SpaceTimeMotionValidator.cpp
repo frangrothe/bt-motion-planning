@@ -21,16 +21,16 @@ bool SpaceTimeMotionValidator::checkMotion(const ompl::base::State *s1, const om
     /*
      * Check if motion is forward in time and is not exceeding the speed limit
      */
-    auto deltaX = vectorStateSpace_.distance(s1->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0),
-            s2->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0));
+    auto deltaSpace = vectorStateSpace_.distance(s1->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0),
+                                                 s2->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0));
 
-//    auto deltaX = abs(s2->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0]
+//    auto deltaSpace = abs(s2->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0]
 //                      - s1->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0]);
 
     auto deltaT = s2->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position
                   - s1->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
 
-    if (!(deltaT > 0 && deltaX / deltaT <= vMax_)) {
+    if (!(deltaT > 0 && deltaSpace / deltaT <= vMax_)) {
         invalid_++;
         return false;
     }
