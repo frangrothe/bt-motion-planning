@@ -13,26 +13,26 @@ list(APPEND LIBRARIES ${OMPL_LIBRARIES})
 include_directories(${INCLUDE_DIRS})
 link_libraries(${LIBRARIES})
 
-include_directories(ToyExamples)
+include_directories(Time1D)
 
 
 add_executable(bt_robotics
         main.cpp
-        ToyExamples/RigidBody3D.h ToyExamples/RigidBody3D.cpp
         auxillary.cpp auxillary.h
-        ToyExamples/Time1DPlanner.cpp ToyExamples/Time1DPlanner.h
-        ToyExamples/Time1DStateValidityChecker.cpp ToyExamples/Time1DStateValidityChecker.h
-        ToyExamples/Time1DMotionValidator.cpp ToyExamples/Time1DMotionValidator.h
-        ToyExamples/Time1DGoal.cpp ToyExamples/Time1DGoal.h
-        ToyExamples/Time1DGoalRegion.cpp ToyExamples/Time1DGoalRegion.h
-        ToyExamples/Time1DValidStateSampler.cpp ToyExamples/Time1DValidStateSampler.h
-        ToyExamples/planner/TimeRRT.cpp ToyExamples/planner/TimeRRT.h
-        SpaceTimePlanning/SpaceTimePlanner.cpp SpaceTimePlanning/SpaceTimePlanner.h
-        SpaceTimePlanning/spaces/AnimationStateSpace.cpp SpaceTimePlanning/spaces/AnimationStateSpace.h
-        SpaceTimePlanning/SpaceTimeStateValidityChecker.cpp SpaceTimePlanning/SpaceTimeStateValidityChecker.h
-        SpaceTimePlanning/SpaceTimeMotionValidator.cpp SpaceTimePlanning/SpaceTimeMotionValidator.h
-        structs/Constraint.h
+        Time1D/Time1DPlanner.cpp Time1D/Time1DPlanner.h
+        Time1D/Time1DStateValidityChecker.cpp Time1D/Time1DStateValidityChecker.h
+        Time1D/Time1DMotionValidator.cpp Time1D/Time1DMotionValidator.h
+        Time1D/Time1DGoal.cpp Time1D/Time1DGoal.h
+        Time1D/Time1DGoalRegion.cpp Time1D/Time1DGoalRegion.h
+        Time1D/Time1DValidStateSampler.cpp Time1D/Time1DValidStateSampler.h
+        Time2D/SpaceTimePlanner.cpp Time2D/SpaceTimePlanner.h
+        SpaceTimePlanning/AnimationStateSpace.cpp SpaceTimePlanning/AnimationStateSpace.h
+        Time2D/SpaceTimeStateValidityChecker.cpp Time2D/SpaceTimeStateValidityChecker.h
+        Time2D/SpaceTimeMotionValidator.cpp Time2D/SpaceTimeMotionValidator.h
+        Time1D/Constraint.h
         structs/Constraint2D.h
-        SpaceTimePlanning/goals/SpaceTimeSampler.cpp SpaceTimePlanning/goals/SpaceTimeSampler.h
-        SpaceTimePlanning/goals/SpaceTimeGoalRegion.cpp SpaceTimePlanning/goals/SpaceTimeGoalRegion.h json.h)
+        Time2D/goals/SpaceTimeSampler.cpp Time2D/goals/SpaceTimeSampler.h
+        Time2D/goals/SpaceTimeGoalRegion.cpp Time2D/goals/SpaceTimeGoalRegion.h
+        json.h
+        SpaceTimePlanning/SpaceTimeRRT.cpp SpaceTimePlanning/SpaceTimeRRT.h)
 

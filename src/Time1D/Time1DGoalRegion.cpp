@@ -5,7 +5,7 @@
 
 #include "Time1DGoalRegion.h"
 
-namespace t1d {
+namespace time_1d {
 
 Time1DGoalRegion::Time1DGoalRegion(const ob::SpaceInformationPtr &si, double minX, double maxX, double minTime,
                                    double maxTime) : GoalSampleableRegion(si) , minX_(minX), maxX_(maxX),

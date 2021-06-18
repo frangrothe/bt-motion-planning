@@ -4,7 +4,7 @@
 
 #include "SpaceTimeGoalRegion.h"
 
-namespace SpaceTime {
+namespace time_2d {
 
 
 SpaceTimeGoalRegion::SpaceTimeGoalRegion(const ompl::base::SpaceInformationPtr &si, double x, double y,

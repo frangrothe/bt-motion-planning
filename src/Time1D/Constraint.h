@@ -5,6 +5,8 @@
 #ifndef BT_ROBOTICS_CONSTRAINT_H
 #define BT_ROBOTICS_CONSTRAINT_H
 
+namespace time_1d {
+
 struct Constraint {
     double x_lb;
     double x_ub;
@@ -13,6 +15,9 @@ struct Constraint {
 
     Constraint(double xLb, double xUb, double tLb, double tUb) : x_lb(xLb), x_ub(xUb), t_lb(tLb), t_ub(tUb) {}
 };
+}
+
+
 
 
 #endif //BT_ROBOTICS_CONSTRAINT_H

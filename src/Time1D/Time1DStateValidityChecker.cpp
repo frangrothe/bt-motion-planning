@@ -4,7 +4,7 @@
 
 #include "Time1DStateValidityChecker.h"
 
-namespace t1d {
+namespace time_1d {
 
 Time1DStateValidityChecker::Time1DStateValidityChecker(const ob::SpaceInformationPtr &si)
         : StateValidityChecker(si) {}

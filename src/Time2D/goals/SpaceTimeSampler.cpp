@@ -4,7 +4,7 @@
 
 #include "SpaceTimeSampler.h"
 
-namespace SpaceTime {
+namespace time_2d {
 
 SpaceTimeSampler::SpaceTimeSampler(const ompl::base::SpaceInformation *si, double x,
                                                          double y, double minTime, double maxTime)

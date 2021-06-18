@@ -16,14 +16,14 @@
 
 #include "../structs/Constraint2D.h"
 #include "../auxillary.h"
-#include "spaces/AnimationStateSpace.h"
+#include "../SpaceTimePlanning/AnimationStateSpace.h"
 #include "SpaceTimeStateValidityChecker.h"
 #include "SpaceTimeMotionValidator.h"
 #include "goals/SpaceTimeGoalRegion.h"
 
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
-namespace SpaceTime {
+namespace time_2d {
 
 class SpaceTimePlanner {
 

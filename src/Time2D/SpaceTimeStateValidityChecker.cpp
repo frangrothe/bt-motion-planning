@@ -4,7 +4,7 @@
 
 #include "SpaceTimeStateValidityChecker.h"
 
-namespace SpaceTime {
+namespace time_2d {
 
 SpaceTimeStateValidityChecker::SpaceTimeStateValidityChecker(const ompl::base::SpaceInformationPtr &si)
         : StateValidityChecker(si) {}

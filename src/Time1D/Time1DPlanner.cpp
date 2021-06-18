@@ -5,7 +5,7 @@
 #include <ompl/base/ProblemDefinition.h>
 #include "Time1DPlanner.h"
 
-namespace t1d {
+namespace time_1d {
 
 Time1DPlanner::Time1DPlanner(std::string filename) : filename_(std::move(filename)) {}
 
@@ -19,22 +19,24 @@ void Time1DPlanner::planMotion() {
      * space[1] : time
      */
 
-    auto r1State(std::make_shared<ob::RealVectorStateSpace>(1));
-    auto timeState(std::make_shared<ob::TimeStateSpace>());
-    auto space = r1State + timeState;
+//    auto r1State(std::make_shared<ob::RealVectorStateSpace>(1));
+//    auto timeState(std::make_shared<ob::TimeStateSpace>());
+//    auto space = r1State + timeState;
+
+    auto space = std::make_shared<space_time::AnimationStateSpace>(1, vMax_, timeWeight_);
 
     // Set the bounds for R1
     ob::RealVectorBounds bounds(1);
     bounds.setLow(xBoundLow_);
     bounds.setHigh(xBoundHigh_);
-    r1State->setBounds(bounds);
+    space->setVectorBounds(bounds);
 
     // Set the bounds for Time
-    timeState->setBounds(timeBoundLow_, timeBoundHigh_);
+    space->setTimeBounds(timeBoundLow_, timeBoundHigh_);
 
     ob::SpaceInformationPtr si = std::make_shared<ob::SpaceInformation>(space);
     si->setStateValidityChecker(std::make_shared<Time1DStateValidityChecker>(si, constraints_));
-    si->setMotionValidator(std::make_shared<Time1DMotionValidator>(si, maxSpeed_));
+    si->setMotionValidator(std::make_shared<Time1DMotionValidator>(si, vMax_));
 
     //(2) Problem Definition Ptr
     auto pdef(std::make_shared<ob::ProblemDefinition>(si));
@@ -42,13 +44,13 @@ void Time1DPlanner::planMotion() {
     ob::ScopedState<> start(space);
     start[0] = xStart_; // r1State
 
-    minTime_ = (xGoalRegionLeft_ - xStart_) / maxSpeed_; // minimum time at which the goal can be reached
+    minTime_ = (xGoalRegionLeft_ - xStart_) / vMax_; // minimum time at which the goal can be reached
     pdef->addStartState(start);
     pdef->setGoal(std::make_shared<Time1DGoalRegion>(si, xGoalRegionLeft_, xGoalRegionRight_, minTime_, timeBoundHigh_));
 
     //(3) Planner
-    auto planner(std::make_shared<og::RRTConnect>(si));
-//    auto planner(std::make_shared<TimeRRT>(si, maxSpeed_));
+//    auto planner(std::make_shared<og::RRTConnect>(si));
+    auto planner(std::make_shared<space_time::SpaceTimeRRT>(si));
     planner->setRange(plannerRange_);
     planner->setProblemDefinition(pdef);
     planner->setup();

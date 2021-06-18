@@ -1,101 +1,27 @@
 //
-// Created by francesco on 24.05.21.
+// Created by francesco on 18.06.21.
 //
 
 
-#include "TimeRRT.h"
+#include <ompl/tools/config/SelfConfig.h>
+#include "SpaceTimeRRT.h"
 
-namespace t1d {
+namespace space_time {
 
 
-TimeRRT::TimeRRT(const ompl::base::SpaceInformationPtr &si, bool addIntermediateStates)
-        : ob::Planner(si, addIntermediateStates ? "RRTConnectIntermediate" : "RRTConnect") {
-    specs_.recognizedGoal = ob::GOAL_SAMPLEABLE_REGION;
-    specs_.directed = true;
+SpaceTimeRRT::SpaceTimeRRT(const ompl::base::SpaceInformationPtr &si) : Planner(si, "SpaceTimeRRT"),
+                                                                        sampler_(&(*si)){
 
-    Planner::declareParam<double>("range", this, &TimeRRT::setRange, &TimeRRT::getRange, "0.:1.:10000.");
-    Planner::declareParam<bool>("intermediate_states", this, &TimeRRT::setIntermediateStates,
-                                &TimeRRT::getIntermediateStates, "0,1");
-
+    Planner::declareParam<double>("range", this, &SpaceTimeRRT::setRange, &SpaceTimeRRT::getRange, "0.:1.:10000.");
     connectionPoint_ = std::make_pair<ob::State *, ob::State *>(nullptr, nullptr);
     distanceBetweenTrees_ = std::numeric_limits<double>::infinity();
-    addIntermediateStates_ = addIntermediateStates;
-    maxSpeed_ = 1.0;
 }
 
-TimeRRT::TimeRRT(const ompl::base::SpaceInformationPtr &si, double maxSpeed) :
-    Planner(si, "TimeRRT"), maxSpeed_(maxSpeed) {
-    specs_.recognizedGoal = ob::GOAL_SAMPLEABLE_REGION;
-    specs_.directed = true;
-
-    Planner::declareParam<double>("range", this, &TimeRRT::setRange, &TimeRRT::getRange, "0.:1.:10000.");
-    Planner::declareParam<bool>("intermediate_states", this, &TimeRRT::setIntermediateStates,
-                                &TimeRRT::getIntermediateStates, "0,1");
-
-    connectionPoint_ = std::make_pair<ob::State *, ob::State *>(nullptr, nullptr);
-    distanceBetweenTrees_ = std::numeric_limits<double>::infinity();
-    addIntermediateStates_ = false;
-}
-
-TimeRRT::~TimeRRT() {
+SpaceTimeRRT::~SpaceTimeRRT() {
     freeMemory();
 }
 
-void TimeRRT::getPlannerData(ob::PlannerData &data) const {
-    Planner::getPlannerData(data);
-
-    std::vector<Motion *> motions;
-    if (tStart_)
-        tStart_->list(motions);
-
-    for (auto &motion : motions)
-    {
-        if (motion->parent == nullptr)
-            data.addStartVertex(ob::PlannerDataVertex(motion->state, 1));
-        else
-        {
-            data.addEdge(ob::PlannerDataVertex(motion->parent->state, 1), ob::PlannerDataVertex(motion->state, 1));
-        }
-    }
-
-    motions.clear();
-    if (tGoal_)
-        tGoal_->list(motions);
-
-    for (auto &motion : motions)
-    {
-        if (motion->parent == nullptr)
-            data.addGoalVertex(ob::PlannerDataVertex(motion->state, 2));
-        else
-        {
-            // The edges in the goal tree are reversed to be consistent with start tree
-            data.addEdge(ob::PlannerDataVertex(motion->state, 2), ob::PlannerDataVertex(motion->parent->state, 2));
-        }
-    }
-
-    // Add the edge connecting the two trees
-    data.addEdge(data.vertexIndex(connectionPoint_.first), data.vertexIndex(connectionPoint_.second));
-
-    // Add some info.
-    data.properties["approx goal distance REAL"] = ompl::toString(distanceBetweenTrees_);
-}
-
-void TimeRRT::setup() {
-    using namespace ompl::tools;
-    Planner::setup();
-    SelfConfig sc(si_, getName());
-    sc.configurePlannerRange(maxDistance_);
-
-    if (!tStart_)
-        tStart_.reset(SelfConfig::getDefaultNearestNeighbors<Motion *>(this));
-    if (!tGoal_)
-        tGoal_.reset(SelfConfig::getDefaultNearestNeighbors<Motion *>(this));
-    tStart_->setDistanceFunction([this](const Motion *a, const Motion *b) { return distanceFunction(a, b); });
-    // pass goal arguments in swapped order to comply with distance calculation
-    tGoal_->setDistanceFunction([this](const Motion *a, const Motion *b) { return distanceFunction(b, a); });
-}
-
-void TimeRRT::freeMemory() {
+void SpaceTimeRRT::freeMemory() {
     std::vector<Motion *> motions;
 
     if (tStart_)
@@ -119,89 +45,12 @@ void TimeRRT::freeMemory() {
             delete motion;
         }
     }
+
+    sampler_.clear();
 }
 
-void TimeRRT::clear() {
-    Planner::clear();
-    sampler_.reset();
-    freeMemory();
-    if (tStart_)
-        tStart_->clear();
-    if (tGoal_)
-        tGoal_->clear();
-    connectionPoint_ = std::make_pair<ob::State *, ob::State *>(nullptr, nullptr);
-    distanceBetweenTrees_ = std::numeric_limits<double>::infinity();
-}
+ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc) {
 
-TimeRRT::GrowState TimeRRT::growTree(TimeRRT::TreeData &tree, TimeRRT::TreeGrowingInfo &tgi, TimeRRT::Motion *rmotion) {
-    /* find closest state in the tree */
-    Motion *nmotion = tree->nearest(rmotion);
-
-    /* assume we can reach the state we go towards */
-    bool reach = true;
-
-    /* find state to add */
-    ob::State *dstate = rmotion->state;
-    double d = si_->distance(nmotion->state, rmotion->state);
-    if (d > maxDistance_)
-    {
-        si_->getStateSpace()->interpolate(nmotion->state, rmotion->state, maxDistance_ / d, tgi.xstate);
-
-        /* Check if we have moved at all. Due to some stranger state spaces (e.g., the constrained state spaces),
-         * interpolate can fail and no progress is made. Without this check, the algorithm gets stuck in a loop as it
-         * thinks it is making progress, when none is actually occurring. */
-        if (si_->equalStates(nmotion->state, tgi.xstate))
-            return TRAPPED;
-
-        dstate = tgi.xstate;
-        reach = false;
-    }
-
-    bool validMotion = tgi.start ? si_->checkMotion(nmotion->state, dstate) :
-                       si_->isValid(dstate) && si_->checkMotion(dstate, nmotion->state);
-
-    if (!validMotion)
-        return TRAPPED;
-
-    if (addIntermediateStates_)
-    {
-        const ob::State *astate = tgi.start ? nmotion->state : dstate;
-        const ob::State *bstate = tgi.start ? dstate : nmotion->state;
-
-        std::vector<ob::State *> states;
-        const unsigned int count = si_->getStateSpace()->validSegmentCount(astate, bstate);
-
-        if (si_->getMotionStates(astate, bstate, states, count, true, true))
-            si_->freeState(states[0]);
-
-        for (std::size_t i = 1; i < states.size(); ++i)
-        {
-            auto *motion = new Motion;
-            motion->state = states[i];
-            motion->parent = nmotion;
-            motion->root = nmotion->root;
-            tree->add(motion);
-
-            nmotion = motion;
-        }
-
-        tgi.xmotion = nmotion;
-    }
-    else
-    {
-        auto *motion = new Motion(si_);
-        si_->copyState(motion->state, dstate);
-        motion->parent = nmotion;
-        motion->root = nmotion->root;
-        tree->add(motion);
-
-        tgi.xmotion = motion;
-    }
-
-    return reach ? REACHED : ADVANCED;
-}
-
-ob::PlannerStatus TimeRRT::solve(const ob::PlannerTerminationCondition &ptc) {
     checkValidity();
     auto *goal = dynamic_cast<ob::GoalSampleableRegion *>(pdef_->getGoal().get());
 
@@ -213,10 +62,16 @@ ob::PlannerStatus TimeRRT::solve(const ob::PlannerTerminationCondition &ptc) {
 
     while (const ob::State *st = pis_.nextStart())
     {
+        std::cout << "Start state found" << std::endl;
+
         auto *motion = new Motion(si_);
         si_->copyState(motion->state, st);
         motion->root = motion->state;
         tStart_->add(motion);
+
+        auto s = si_->allocState();
+        si_->copyState(s, st);
+        sampler_.addStartState(s);
     }
 
     if (tStart_->size() == 0)
@@ -230,9 +85,6 @@ ob::PlannerStatus TimeRRT::solve(const ob::PlannerTerminationCondition &ptc) {
         OMPL_ERROR("%s: Insufficient states in sampleable goal region", getName().c_str());
         return ob::PlannerStatus::INVALID_GOAL;
     }
-
-    if (!sampler_)
-        sampler_ = si_->allocStateSampler();
 
     OMPL_INFORM("%s: Starting planning with %d states already in datastructure", getName().c_str(),
                 (int)(tStart_->size() + tGoal_->size()));
@@ -263,6 +115,10 @@ ob::PlannerStatus TimeRRT::solve(const ob::PlannerTerminationCondition &ptc) {
                 si_->copyState(motion->state, st);
                 motion->root = motion->state;
                 tGoal_->add(motion);
+
+                auto s = si_->allocState();
+                si_->copyState(s, st);
+                sampler_.addGoalState(s);
             }
 
             if (tGoal_->size() == 0)
@@ -273,7 +129,7 @@ ob::PlannerStatus TimeRRT::solve(const ob::PlannerTerminationCondition &ptc) {
         }
 
         /* sample random state */
-        sampler_->sampleUniform(rstate);
+        sampler_.sample(rstate);
 
         GrowState gs = growTree(tree, tgi, rmotion);
 
@@ -391,22 +247,140 @@ ob::PlannerStatus TimeRRT::solve(const ob::PlannerTerminationCondition &ptc) {
     return solved ? ob::PlannerStatus::EXACT_SOLUTION : ob::PlannerStatus::TIMEOUT;
 }
 
-double TimeRRT::distanceFunction(const TimeRRT::Motion *a, const TimeRRT::Motion *b) const {
-    /*
-     * Check if motion is forward in time and is not exceeding the speed limit
+SpaceTimeRRT::GrowState SpaceTimeRRT::growTree(SpaceTimeRRT::TreeData &tree, SpaceTimeRRT::TreeGrowingInfo &tgi,
+                                               SpaceTimeRRT::Motion *rmotion) {
+    /* find closest state in the tree */
+    Motion *nmotion = tree->nearest(rmotion);
+
+    /* assume we can reach the state we go towards */
+    bool reach = true;
+
+    /* find state to add */
+    ob::State *dstate = rmotion->state;
+    double d = si_->distance(nmotion->state, rmotion->state);
+    if (d > maxDistance_)
+    {
+        si_->getStateSpace()->interpolate(nmotion->state, rmotion->state, maxDistance_ / d, tgi.xstate);
+
+        /* Check if we have moved at all. Due to some stranger state spaces (e.g., the constrained state spaces),
+         * interpolate can fail and no progress is made. Without this check, the algorithm gets stuck in a loop as it
+         * thinks it is making progress, when none is actually occurring. */
+        if (si_->equalStates(nmotion->state, tgi.xstate))
+            return TRAPPED;
+
+        dstate = tgi.xstate;
+        reach = false;
+    }
+
+    bool validMotion = tgi.start ? si_->checkMotion(nmotion->state, dstate) :
+                       si_->isValid(dstate) && si_->checkMotion(dstate, nmotion->state);
+
+    if (!validMotion)
+        return TRAPPED;
+
+    /**
+     * replaces EXTEND by CONNECT
      */
-    auto deltaX = abs(a->state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0]
-                      - b->state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0]);
+//    if (addIntermediateStates_)
+//    {
+//        const base::State *astate = tgi.start ? nmotion->state : dstate;
+//        const base::State *bstate = tgi.start ? dstate : nmotion->state;
+//
+//        std::vector<base::State *> states;
+//        const unsigned int count = si_->getStateSpace()->validSegmentCount(astate, bstate);
+//
+//        if (si_->getMotionStates(astate, bstate, states, count, true, true))
+//            si_->freeState(states[0]);
+//
+//        for (std::size_t i = 1; i < states.size(); ++i)
+//        {
+//            auto *motion = new Motion;
+//            motion->state = states[i];
+//            motion->parent = nmotion;
+//            motion->root = nmotion->root;
+//            tree->add(motion);
+//
+//            nmotion = motion;
+//        }
+//
+//        tgi.xmotion = nmotion;
+//    }
 
-    auto deltaT = a->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position
-                  - b->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+    auto *motion = new Motion(si_);
+    si_->copyState(motion->state, dstate);
+    motion->parent = nmotion;
+    motion->root = nmotion->root;
+    tree->add(motion);
 
-    auto dist = (deltaT <= 0 || deltaX / deltaT > maxSpeed_) ?
-            std::numeric_limits<double>::infinity() : (1 - distanceTimeWeight_) * deltaX + distanceTimeWeight_ * deltaT;
+    tgi.xmotion = motion;
 
-    return dist;
-//    return si_->distance(a->state, b->state);
+
+    return reach ? REACHED : ADVANCED;
 }
 
+void SpaceTimeRRT::clear() {
+    Planner::clear();
+    freeMemory();
+    if (tStart_)
+        tStart_->clear();
+    if (tGoal_)
+        tGoal_->clear();
+    connectionPoint_ = std::make_pair<ob::State *, ob::State *>(nullptr, nullptr);
+    distanceBetweenTrees_ = std::numeric_limits<double>::infinity();
+}
+
+void SpaceTimeRRT::getPlannerData(ob::PlannerData &data) const {
+
+    Planner::getPlannerData(data);
+
+    std::vector<Motion *> motions;
+    if (tStart_)
+        tStart_->list(motions);
+
+    for (auto &motion : motions)
+    {
+        if (motion->parent == nullptr)
+            data.addStartVertex(ob::PlannerDataVertex(motion->state, 1));
+        else
+        {
+            data.addEdge(ob::PlannerDataVertex(motion->parent->state, 1), ob::PlannerDataVertex(motion->state, 1));
+        }
+    }
+
+    motions.clear();
+    if (tGoal_)
+        tGoal_->list(motions);
+
+    for (auto &motion : motions)
+    {
+        if (motion->parent == nullptr)
+            data.addGoalVertex(ob::PlannerDataVertex(motion->state, 2));
+        else
+        {
+            // The edges in the goal tree are reversed to be consistent with start tree
+            data.addEdge(ob::PlannerDataVertex(motion->state, 2), ob::PlannerDataVertex(motion->parent->state, 2));
+        }
+    }
+
+    // Add the edge connecting the two trees
+    data.addEdge(data.vertexIndex(connectionPoint_.first), data.vertexIndex(connectionPoint_.second));
+
+    // Add some info.
+    data.properties["approx goal distance REAL"] = ompl::toString(distanceBetweenTrees_);
+}
+
+void SpaceTimeRRT::setup() {
+
+    Planner::setup();
+    ompl::tools::SelfConfig sc(si_, getName());
+    sc.configurePlannerRange(maxDistance_);
+
+    if (!tStart_)
+        tStart_.reset(ompl::tools::SelfConfig::getDefaultNearestNeighbors<Motion *>(this));
+    if (!tGoal_)
+        tGoal_.reset(ompl::tools::SelfConfig::getDefaultNearestNeighbors<Motion *>(this));
+    tStart_->setDistanceFunction([this](const Motion *a, const Motion *b) { return distanceFunction(a, b); });
+    tGoal_->setDistanceFunction([this](const Motion *a, const Motion *b) { return distanceFunction(a, b); });
+}
 
 }

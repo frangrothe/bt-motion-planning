@@ -9,7 +9,7 @@
 #include <ompl/base/spaces/RealVectorStateSpace.h>
 
 namespace ob = ompl::base;
-namespace t1d {
+namespace time_1d {
 
 class Time1DGoal : public ob::Goal {
 

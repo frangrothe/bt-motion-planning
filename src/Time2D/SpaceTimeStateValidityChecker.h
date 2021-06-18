@@ -16,7 +16,7 @@
 #include "../structs/Constraint2D.h"
 
 namespace ob = ompl::base;
-namespace SpaceTime {
+namespace time_2d {
 
 class SpaceTimeStateValidityChecker : public ob::StateValidityChecker {
 public:

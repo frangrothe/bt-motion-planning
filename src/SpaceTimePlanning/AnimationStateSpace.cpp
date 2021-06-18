@@ -4,7 +4,7 @@
 
 #include "AnimationStateSpace.h"
 
-namespace SpaceTime {
+namespace space_time {
 
 AnimationStateSpace::AnimationStateSpace(unsigned int dim, double vMax, double timeWeight) : vMax_(vMax) {
     if (timeWeight < 0 || timeWeight > 1)
@@ -57,4 +57,8 @@ void AnimationStateSpace::setVMax(double vMax) {
     vMax_ = vMax;
 }
 
+double AnimationStateSpace::timeToCoverDistance(const ompl::base::State *state1, const ompl::base::State *state2) const {
+    double deltaSpace = distanceSpace(state1, state2);
+    return deltaSpace / vMax_;
+}
 }

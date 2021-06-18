@@ -6,7 +6,7 @@
 
 #include "Time1DValidStateSampler.h"
 
-namespace t1d {
+namespace time_1d {
 
 Time1DValidStateSampler::Time1DValidStateSampler(const ompl::base::SpaceInformation *si, double minX, double maxX,
                                                  double minTime, double maxTime) : ValidStateSampler(si), minX_(minX),

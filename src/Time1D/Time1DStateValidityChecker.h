@@ -9,10 +9,10 @@
 #include <ompl/base/spaces/RealVectorStateSpace.h>
 #include <ompl/base/spaces/TimeStateSpace.h>
 
-#include "../structs/Constraint.h"
+#include "Constraint.h"
 
 namespace ob = ompl::base;
-namespace t1d {
+namespace time_1d {
 
 class Time1DStateValidityChecker : public ob::StateValidityChecker{
 

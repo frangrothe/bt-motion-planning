@@ -4,7 +4,7 @@
 
 #include "Time1DMotionValidator.h"
 
-namespace t1d {
+namespace time_1d {
 
 Time1DMotionValidator::Time1DMotionValidator(const ob::SpaceInformationPtr &si, double maxSpeed)
         : MotionValidator(si), maxSpeed_(maxSpeed), stateSpace_(si_->getStateSpace().get()) {}

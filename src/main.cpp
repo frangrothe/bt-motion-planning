@@ -1,7 +1,6 @@
 #include <iostream>
-#include "RigidBody3D.h"
-#include "Time1DPlanner.h"
-#include "SpaceTimePlanning/SpaceTimePlanner.h"
+#include "Time1D/Time1DPlanner.h"
+#include "Time2D/SpaceTimePlanner.h"
 
 #include "auxillary.h"
 #include "structs/Constraint2D.h"
@@ -18,9 +17,8 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Filename is: " << filename << std::endl;
 
-//    rb3d::planRigidBody3D();
-//    t1d::Time1DPlanner planner{filename};
-    SpaceTime::SpaceTimePlanner planner{filename};
+    time_1d::Time1DPlanner planner{filename};
+//    time_2d::SpaceTimePlanner planner{filename};
     planner.planMotion();
 //    planner.test();
 

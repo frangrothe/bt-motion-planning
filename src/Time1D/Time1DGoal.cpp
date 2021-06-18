@@ -5,7 +5,7 @@
 
 #include "Time1DGoal.h"
 
-namespace t1d {
+namespace time_1d {
 
 Time1DGoal::Time1DGoal(const ompl::base::SpaceInformationPtr &si, double x) : Goal(si), x_(x) {}
 

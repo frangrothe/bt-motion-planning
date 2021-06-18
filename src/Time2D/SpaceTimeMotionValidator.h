@@ -13,10 +13,10 @@
 
 #include <queue>
 
-#include "spaces/AnimationStateSpace.h"
+#include "../SpaceTimePlanning/AnimationStateSpace.h"
 
 namespace ob = ompl::base;
-namespace SpaceTime {
+namespace time_2d {
 
 class SpaceTimeMotionValidator : public ob::MotionValidator {
 

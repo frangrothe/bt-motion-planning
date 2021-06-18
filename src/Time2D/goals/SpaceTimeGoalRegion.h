@@ -14,7 +14,7 @@
 #include "SpaceTimeSampler.h"
 
 namespace ob = ompl::base;
-namespace SpaceTime {
+namespace time_2d {
 
 class SpaceTimeGoalRegion : public ob::GoalSampleableRegion {
 

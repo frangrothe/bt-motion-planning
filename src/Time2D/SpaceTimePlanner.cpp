@@ -4,14 +4,14 @@
 
 #include "SpaceTimePlanner.h"
 
-namespace SpaceTime {
+namespace time_2d {
 
 SpaceTimePlanner::SpaceTimePlanner(std::string filename) : filename_(std::move(filename)) {}
 
 void SpaceTimePlanner::planMotion() {
 
     //(1) Define State Space
-    auto space = std::make_shared<AnimationStateSpace>(2);
+    auto space = std::make_shared<space_time::AnimationStateSpace>(2);
     // Set the bounds
     ob::RealVectorBounds bounds(2);
     bounds.setLow(0, xBoundLow_);

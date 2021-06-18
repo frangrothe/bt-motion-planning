@@ -14,7 +14,7 @@
 #include <queue>
 
 namespace ob = ompl::base;
-namespace t1d {
+namespace time_1d {
 
 class Time1DMotionValidator : public ob::MotionValidator {
 

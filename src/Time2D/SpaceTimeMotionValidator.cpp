@@ -4,7 +4,7 @@
 
 #include "SpaceTimeMotionValidator.h"
 
-namespace SpaceTime {
+namespace time_2d {
 
 SpaceTimeMotionValidator::SpaceTimeMotionValidator(const ompl::base::SpaceInformationPtr &si, unsigned int dim,
                                                    double vMax)

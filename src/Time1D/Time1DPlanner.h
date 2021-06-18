@@ -20,12 +20,13 @@
 #include "Time1DStateValidityChecker.h"
 #include "Time1DMotionValidator.h"
 #include "Time1DGoalRegion.h"
-#include "../structs/Constraint.h"
-#include "planner/TimeRRT.h"
+#include "Constraint.h"
+#include "../SpaceTimePlanning/SpaceTimeRRT.h"
+#include "../SpaceTimePlanning/AnimationStateSpace.h"
 
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
-namespace t1d {
+namespace time_1d {
 
 class Time1DPlanner {
 
@@ -49,9 +50,10 @@ private:
             {0.4, 0.8, 0.8, 1.2},
             {0.05, 0.15, 0.3, 0.6}
     };
-    double maxSpeed_ = 1.0; // 1 m/s
+    double vMax_ = 1.0; // 1 m/s
+    double timeWeight_ = 0.5; // compared to distance weight used in distance function. [0,1]
     double solveTime_ = 1.0; // in seconds
-    double plannerRange_ = 0.5;
+    double plannerRange_ = 0.2;
 
     std::string filename_;
     std::string csvDelim_ = ",";

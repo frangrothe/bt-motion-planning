@@ -14,7 +14,7 @@
 #include "Time1DValidStateSampler.h"
 
 namespace ob = ompl::base;
-namespace t1d {
+namespace time_1d {
 
 class Time1DGoalRegion : public ob::GoalSampleableRegion {
 
