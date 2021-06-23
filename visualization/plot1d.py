@@ -37,14 +37,10 @@ def plot_motion_plan(filename):
 
     # draw base graph
     for i in range(len(df_samples.index)):
-        in_edges = df_samples.iloc[i, in_edge_index].split('#')
+        in_edges = [int(x) for x in df_samples.iloc[i, in_edge_index].split('#') if x]
         for e in in_edges:
-            if int(e) < 0:
-                continue
-            else:
-                j = int(e)
-                plt.plot([df_samples.iloc[i, x_index], df_samples.iloc[j, x_index]],
-                         [df_samples.iloc[i, t_index], df_samples.iloc[j, t_index]], '.-k')
+            plt.plot([df_samples.iloc[i, x_index], df_samples.iloc[e, x_index]],
+                     [df_samples.iloc[i, t_index], df_samples.iloc[e, t_index]], '.-k')
     # plot solution path
     plt.plot(df_path['x'].to_numpy(), df_path['time'].to_numpy(), 'D-', linewidth=2, color=ibm_red)
     print('\nSolution Path Length: ' + str(len(df_path.index)))

@@ -6,13 +6,13 @@
 
 namespace space_time {
 
-AnimationStateSpace::AnimationStateSpace(unsigned int dim, double vMax, double timeWeight) : vMax_(vMax) {
+AnimationStateSpace::AnimationStateSpace(const ob::StateSpacePtr& spaceComponent, double vMax, double timeWeight) : vMax_(vMax) {
     if (timeWeight < 0 || timeWeight > 1)
         throw ompl::Exception("Error in AnimationStateSpace Construction: Time weight must be between 0 and 1");
 
     setName("AnimationStateSpace" + getName());
-    addSubspace(std::make_shared<ob::RealVectorStateSpace>(dim), (1 - timeWeight));
-    addSubspace(std::make_shared<ob::TimeStateSpace>(), timeWeight);
+    addSubspace(spaceComponent, (1 - timeWeight)); // space component
+    addSubspace(std::make_shared<ob::TimeStateSpace>(), timeWeight); // time component
     lock();
 }
 
@@ -31,7 +31,6 @@ double AnimationStateSpace::distanceSpace(const ompl::base::State *state1, const
     const auto *cstate2 = dynamic_cast<const ob::CompoundState *>(state2);
 
     return components_[0]->distance(cstate1->components[0], cstate2->components[0]);
-
 }
 
 double AnimationStateSpace::distanceTime(const ompl::base::State *state1, const ompl::base::State *state2) const {
@@ -39,10 +38,6 @@ double AnimationStateSpace::distanceTime(const ompl::base::State *state1, const 
     const auto *cstate2 = dynamic_cast<const ob::CompoundState *>(state2);
 
     return components_[1]->distance(cstate1->components[1], cstate2->components[1]);
-}
-
-void AnimationStateSpace::setVectorBounds(const ob::RealVectorBounds &bounds) {
-    as<ob::RealVectorStateSpace>(0)->setBounds(bounds);
 }
 
 void AnimationStateSpace::setTimeBounds(double lb, double ub) {
@@ -60,5 +55,13 @@ void AnimationStateSpace::setVMax(double vMax) {
 double AnimationStateSpace::timeToCoverDistance(const ompl::base::State *state1, const ompl::base::State *state2) const {
     double deltaSpace = distanceSpace(state1, state2);
     return deltaSpace / vMax_;
+}
+
+ob::StateSpacePtr AnimationStateSpace::getSpaceComponent() {
+    return components_[0];
+}
+
+ob::TimeStateSpace * AnimationStateSpace::getTimeComponent() {
+    return components_[1]->as<ob::TimeStateSpace>();
 }
 }

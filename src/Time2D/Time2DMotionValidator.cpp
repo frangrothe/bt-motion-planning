@@ -2,16 +2,16 @@
 // Created by francesco on 27.05.21.
 //
 
-#include "SpaceTimeMotionValidator.h"
+#include "Time2DMotionValidator.h"
 
 namespace time_2d {
 
-SpaceTimeMotionValidator::SpaceTimeMotionValidator(const ompl::base::SpaceInformationPtr &si, unsigned int dim,
+Time2DMotionValidator::Time2DMotionValidator(const ompl::base::SpaceInformationPtr &si, unsigned int dim,
                                                    double vMax)
         : MotionValidator(si), stateSpace_(si_->getStateSpace().get()), vMax_(vMax),
           vectorStateSpace_(dim) {}
 
-bool SpaceTimeMotionValidator::checkMotion(const ompl::base::State *s1, const ompl::base::State *s2) const {
+bool Time2DMotionValidator::checkMotion(const ompl::base::State *s1, const ompl::base::State *s2) const {
     /* assume motion starts in a valid configuration so s1 is valid */
     if (!si_->isValid(s2)) {
         invalid_++;
@@ -87,7 +87,7 @@ bool SpaceTimeMotionValidator::checkMotion(const ompl::base::State *s1, const om
     return result;
 }
 
-bool SpaceTimeMotionValidator::checkMotion(const ompl::base::State *s1, const ompl::base::State *s2,
+bool Time2DMotionValidator::checkMotion(const ompl::base::State *s1, const ompl::base::State *s2,
                                            std::pair<ob::State *, double> &lastValid) const {
     return checkMotion(s1, s2);
 }

@@ -1,31 +1,31 @@
 //
-// Created by francesco on 27.05.21.
+// Created by francesco on 21.06.21.
 //
 
-#include <tuple>
+#ifndef BT_ROBOTICS_DUBINSCONSTRAINT_H
+#define BT_ROBOTICS_DUBINSCONSTRAINT_H
 
-#ifndef BT_ROBOTICS_CONSTRAINT2D_H
-#define BT_ROBOTICS_CONSTRAINT2D_H
+namespace dubins {
 
-struct Constraint2D {
+struct DubinsConstraint {
     typedef std::function<std::tuple<double, double> (double, double, double)> MoveFunc;
 
 public:
-    Constraint2D(MoveFunc mf, double startX, double startY, double widthX = 0.1, double widthY = 0.1) :
-        startX_(startX), startY_(startY), widthX_(widthX), widthY_(widthY), moveFunc_(mf) {};
+    DubinsConstraint(MoveFunc mf, double startX, double startY, double widthX = 0.1, double widthY = 0.1) :
+    startX_(startX), startY_(startY), widthX_(widthX), widthY_(widthY), moveFunc_(mf) {};
 
     std::tuple<double, double, double, double> getBoundsForTime (double t) const{
         double x, y;
         std::tie(x, y) = moveFunc_(startX_, startY_, t);
         return checkBounds(x - widthX_, x + widthX_, y - widthY_, y + widthY_);
-    }
+    };
 
     void setBounds(double xLow, double xHigh, double yLow, double yHigh) {
         xBoundLow_ = xLow;
         xBoundHigh_ = xHigh;
         yBoundLow_ = yLow;
         yBoundHigh_ = yHigh;
-    }
+    };
 
 private:
     double xBoundLow_ = -std::numeric_limits<double>::infinity();
@@ -52,8 +52,8 @@ private:
         yHigh = yHigh > yBoundHigh_ ? yBoundHigh_ : yHigh;
 
         return std::make_tuple(xLow, xHigh, yLow, yHigh);
-    }
-
+    };
 };
+}
 
-#endif //BT_ROBOTICS_CONSTRAINT2D_H
+#endif //BT_ROBOTICS_DUBINSCONSTRAINT_H

@@ -1,26 +1,49 @@
 #include <iostream>
-#include "Time1D/Time1DPlanner.h"
-#include "Time2D/SpaceTimePlanner.h"
 
+#include "Time1D/Time1DPlanner.h"
+#include "Time2D/Time2DPlanner.h"
+#include "Dubins/DubinsPlanner.h"
 #include "auxillary.h"
-#include "structs/Constraint2D.h"
 
 int main(int argc, char* argv[]) {
 
     std::string filename;
+    int plannerType = 0;
     if (argc < 2) {
         filename = auxillary::currentDateTime();
     }
     else {
         filename = argv[1];
     }
+    if (argc > 2) {
+        plannerType = std::stoi(argv[2]);
+    }
 
-    std::cout << "Filename is: " << filename << std::endl;
+    std::cout << "Planner Type is " << plannerType;
+    std::cout << "\nFilename is: " << filename << std::endl;
 
-    time_1d::Time1DPlanner planner{filename};
-//    time_2d::SpaceTimePlanner planner{filename};
-    planner.planMotion();
-//    planner.test();
+    switch (plannerType) {
+        case 1: {
+            time_1d::Time1DPlanner planner{filename};
+            planner.planMotion();
+            break;
+        }
+        case 2: {
+            time_2d::Time2DPlanner planner{filename};
+            planner.planMotion();
+            break;
+        }
+        case 3: {
+            dubins::DubinsPlanner planner{filename};
+            planner.planMotion();
+            break;
+        }
+        default: {
+            time_2d::Time2DPlanner planner{filename};
+//            planner.planMotion();
+            planner.test();
+        }
+    }
 
     return 0;
 }

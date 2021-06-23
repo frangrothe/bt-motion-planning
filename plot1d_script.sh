@@ -6,6 +6,6 @@ mkdir data/"$stored_date"
 cd src/cmake-build-debug
 make
 cd ../..
-src/cmake-build-debug/bt_robotics "$stored_date"
+src/cmake-build-debug/bt_robotics "$stored_date" "1"
 python3 visualization/plot1d.py "$stored_date"
 

@@ -16,24 +16,27 @@ namespace space_time {
 class AnimationStateSpace : public ob::CompoundStateSpace {
 
 public:
-    explicit AnimationStateSpace(unsigned int dim, double vMax = 1.0, double timeWeight = 0.5);
+    explicit AnimationStateSpace(const ob::StateSpacePtr& spaceComponent, double vMax = 1.0, double timeWeight = 0.5);
 
     double distance(const ompl::base::State *state1, const ompl::base::State *state2) const override;
 
     /** \brief The time to get from state1 to state2 with respect to vMax */
     double timeToCoverDistance(const ompl::base::State *state1, const ompl::base::State *state2) const;
 
-    void setVectorBounds(const ob::RealVectorBounds &bounds);
+    /** \brief The distance of just the space component */
+    double distanceSpace(const ompl::base::State *state1, const ompl::base::State *state2) const;
+
+    /** \brief The distance of just the time component */
+    double distanceTime(const ompl::base::State *state1, const ompl::base::State *state2) const;
+
     void setTimeBounds(double lb, double ub);
     double getVMax() const;
     void setVMax(double vMax);
+    ob::StateSpacePtr getSpaceComponent();
+    ob::TimeStateSpace * getTimeComponent();
 
 protected:
     double vMax_; // maximum velocity
-
-    double distanceSpace(const ompl::base::State *state1, const ompl::base::State *state2) const;
-    double distanceTime(const ompl::base::State *state1, const ompl::base::State *state2) const;
-
 };
 }
 

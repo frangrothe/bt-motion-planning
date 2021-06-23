@@ -2,18 +2,18 @@
 // Created by francesco on 27.05.21.
 //
 
-#include "SpaceTimeStateValidityChecker.h"
+#include "Time2DStateValidityChecker.h"
 
 namespace time_2d {
 
-SpaceTimeStateValidityChecker::SpaceTimeStateValidityChecker(const ompl::base::SpaceInformationPtr &si)
+Time2DStateValidityChecker::Time2DStateValidityChecker(const ompl::base::SpaceInformationPtr &si)
         : StateValidityChecker(si) {}
 
-SpaceTimeStateValidityChecker::SpaceTimeStateValidityChecker(const ompl::base::SpaceInformationPtr &si,
-                                                             std::vector<Constraint2D> constraints)
+Time2DStateValidityChecker::Time2DStateValidityChecker(const ompl::base::SpaceInformationPtr &si,
+                                                             std::vector<Constraint> constraints)
         : StateValidityChecker(si), constraints_(std::move(constraints)) {}
 
-bool SpaceTimeStateValidityChecker::isValid(const ompl::base::State *state) const {
+bool Time2DStateValidityChecker::isValid(const ompl::base::State *state) const {
     double x = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
     double y = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[1];
     double t = state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;

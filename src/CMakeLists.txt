@@ -22,17 +22,22 @@ add_executable(bt_robotics
         Time1D/Time1DPlanner.cpp Time1D/Time1DPlanner.h
         Time1D/Time1DStateValidityChecker.cpp Time1D/Time1DStateValidityChecker.h
         Time1D/Time1DMotionValidator.cpp Time1D/Time1DMotionValidator.h
-        Time1D/Time1DGoal.cpp Time1D/Time1DGoal.h
         Time1D/Time1DGoalRegion.cpp Time1D/Time1DGoalRegion.h
         Time1D/Time1DValidStateSampler.cpp Time1D/Time1DValidStateSampler.h
-        Time2D/SpaceTimePlanner.cpp Time2D/SpaceTimePlanner.h
+        Time2D/Time2DPlanner.cpp Time2D/Time2DPlanner.h
         SpaceTimePlanning/AnimationStateSpace.cpp SpaceTimePlanning/AnimationStateSpace.h
-        Time2D/SpaceTimeStateValidityChecker.cpp Time2D/SpaceTimeStateValidityChecker.h
-        Time2D/SpaceTimeMotionValidator.cpp Time2D/SpaceTimeMotionValidator.h
+        Time2D/Time2DStateValidityChecker.cpp Time2D/Time2DStateValidityChecker.h
+        Time2D/Time2DMotionValidator.cpp Time2D/Time2DMotionValidator.h
         Time1D/Constraint.h
-        structs/Constraint2D.h
-        Time2D/goals/SpaceTimeSampler.cpp Time2D/goals/SpaceTimeSampler.h
-        Time2D/goals/SpaceTimeGoalRegion.cpp Time2D/goals/SpaceTimeGoalRegion.h
+        Time2D/Constraint.h
+        Time2D/goals/Time2DSampler.cpp Time2D/goals/Time2DSampler.h
+        Time2D/goals/Time2DGoalRegion.cpp Time2D/goals/Time2DGoalRegion.h
         json.h
-        SpaceTimePlanning/SpaceTimeRRT.cpp SpaceTimePlanning/SpaceTimeRRT.h)
+        SpaceTimePlanning/SpaceTimeRRT.cpp SpaceTimePlanning/SpaceTimeRRT.h
+        Dubins/DubinsPlanner.cpp Dubins/DubinsPlanner.h
+        Dubins/DubinsStateValidityChecker.cpp Dubins/DubinsStateValidityChecker.h
+        Dubins/DubinsMotionValidator.cpp Dubins/DubinsMotionValidator.h
+        Dubins/goals/DubinsGoalRegion.cpp Dubins/goals/DubinsGoalRegion.h
+        Dubins/goals/DubinsGoalSampler.cpp Dubins/goals/DubinsGoalSampler.h
+        Dubins/DubinsConstraint.h)
 

@@ -2,8 +2,8 @@
 // Created by francesco on 27.05.21.
 //
 
-#ifndef BT_ROBOTICS_SPACETIMEMOTIONVALIDATOR_H
-#define BT_ROBOTICS_SPACETIMEMOTIONVALIDATOR_H
+#ifndef BT_ROBOTICS_TIME2DMOTIONVALIDATOR_H
+#define BT_ROBOTICS_TIME2DMOTIONVALIDATOR_H
 
 #include <ompl/base/MotionValidator.h>
 #include <ompl/base/StateSpace.h>
@@ -18,10 +18,10 @@
 namespace ob = ompl::base;
 namespace time_2d {
 
-class SpaceTimeMotionValidator : public ob::MotionValidator {
+class Time2DMotionValidator : public ob::MotionValidator {
 
 public:
-    explicit SpaceTimeMotionValidator(const ompl::base::SpaceInformationPtr &si, unsigned int dim, double vMax = 1.0);
+    explicit Time2DMotionValidator(const ompl::base::SpaceInformationPtr &si, unsigned int dim, double vMax = 1.0);
 
     bool checkMotion(const ompl::base::State *s1, const ompl::base::State *s2) const override;
 
@@ -38,4 +38,4 @@ private:
 
 
 
-#endif //BT_ROBOTICS_SPACETIMEMOTIONVALIDATOR_H
+#endif //BT_ROBOTICS_TIME2DMOTIONVALIDATOR_H

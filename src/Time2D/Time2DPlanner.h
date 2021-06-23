@@ -2,8 +2,8 @@
 // Created by francesco on 27.05.21.
 //
 
-#ifndef BT_ROBOTICS_SPACETIMEPLANNER_H
-#define BT_ROBOTICS_SPACETIMEPLANNER_H
+#ifndef BT_ROBOTICS_TIME2DPLANNER_H
+#define BT_ROBOTICS_TIME2DPLANNER_H
 
 #include <vector>
 #include <iostream>
@@ -14,21 +14,23 @@
 #include <ompl/base/goals/GoalSpace.h>
 #include <ompl/geometric/planners/rrt/RRTConnect.h>
 
-#include "../structs/Constraint2D.h"
+#include "Constraint.h"
 #include "../auxillary.h"
+#include "../json.h"
 #include "../SpaceTimePlanning/AnimationStateSpace.h"
-#include "SpaceTimeStateValidityChecker.h"
-#include "SpaceTimeMotionValidator.h"
-#include "goals/SpaceTimeGoalRegion.h"
+#include "../SpaceTimePlanning/SpaceTimeRRT.h"
+#include "Time2DStateValidityChecker.h"
+#include "Time2DMotionValidator.h"
+#include "goals/Time2DGoalRegion.h"
 
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
 namespace time_2d {
 
-class SpaceTimePlanner {
+class Time2DPlanner {
 
 public:
-    explicit SpaceTimePlanner(std::string filename);
+    explicit Time2DPlanner(std::string filename);
 
     void planMotion();
     void test();
@@ -52,17 +54,17 @@ private:
 //            {0.05, 0.15, 0.3, 0.6}
 //    };
 
-    std::vector<Constraint2D> constraints_{
+    std::vector<Constraint> constraints_{
             // Movement between x = 0 and x = 1
             {[](double x, double y, double t) {
                 x = x + 0.5 * sin(t * M_PI);
                 return std::make_tuple(x, y);
-            }, 0.5,  1.0,  0.1,  0.1},
+            }, 0.5,  0.7,  0.1,  0.1},
 
             // Static obstacle
             {[](double x, double y, double t) {
                 return std::make_tuple(x, y);
-            }, 0.35, 0.35, 0.25, 0.35}
+            }, 0.35, 0.3, 0.25, 0.25}
     };
 
 //    // constant acceleration movement
@@ -77,11 +79,18 @@ private:
 //            x = x + 0.5 * sin(t * M_PI);
 //            return std::make_tuple(x, y);
 //        }, 0.5, 1.0, 0.1, 0.1},
+
     double vMax_ = 1.0; // 1 m/s
     double solveTime_ = 1.0; // in seconds
     double plannerRange_ = 0.5;
 
     std::string filename_;
+    std::string delim_ = ",";
+
+    void writeSamplesToCSV(const ob::PlannerData &data);
+    void writePathToCSV(const ob::PathPtr &pathPtr);
+    void writeConstraintsToJSON();
+    void writeGoalRegionToCSV();
 
 };
 }
@@ -89,4 +98,4 @@ private:
 
 
 
-#endif //BT_ROBOTICS_SPACETIMEPLANNER_H
+#endif //BT_ROBOTICS_TIME2DPLANNER_H

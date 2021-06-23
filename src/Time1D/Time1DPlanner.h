@@ -20,7 +20,7 @@
 #include "Time1DStateValidityChecker.h"
 #include "Time1DMotionValidator.h"
 #include "Time1DGoalRegion.h"
-#include "Constraint.h"
+
 #include "../SpaceTimePlanning/SpaceTimeRRT.h"
 #include "../SpaceTimePlanning/AnimationStateSpace.h"
 
@@ -56,7 +56,7 @@ private:
     double plannerRange_ = 0.2;
 
     std::string filename_;
-    std::string csvDelim_ = ",";
+    std::string delim_ = ",";
 
     void writeSamplesToCSV(const ob::PlannerData &data);
     void writePathToCSV(const ob::PathPtr &);

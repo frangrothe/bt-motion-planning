@@ -2,8 +2,8 @@
 // Created by francesco on 27.05.21.
 //
 
-#ifndef BT_ROBOTICS_SPACETIMESAMPLER_H
-#define BT_ROBOTICS_SPACETIMESAMPLER_H
+#ifndef BT_ROBOTICS_TIME2DSAMPLER_H
+#define BT_ROBOTICS_TIME2DSAMPLER_H
 
 #include <ompl/base/ValidStateSampler.h>
 #include <ompl/base/SpaceInformation.h>
@@ -15,10 +15,10 @@
 namespace ob = ompl::base;
 namespace time_2d {
 
-class SpaceTimeSampler : public ob::ValidStateSampler  {
+class Time2DSampler : public ob::ValidStateSampler {
 
 public:
-    SpaceTimeSampler(const ompl::base::SpaceInformation *si, double x, double y, double minTime,
+    Time2DSampler(const ompl::base::SpaceInformation *si, double x, double y, double minTime,
                                 double maxTime);
 
     bool sample(ompl::base::State *state) override;
@@ -38,4 +38,4 @@ private:
 
 
 
-#endif //BT_ROBOTICS_SPACETIMESAMPLER_H
+#endif //BT_ROBOTICS_TIME2DSAMPLER_H
