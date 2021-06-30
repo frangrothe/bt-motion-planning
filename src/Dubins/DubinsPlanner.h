@@ -50,7 +50,7 @@ private:
     double minTime_ = 0.0; // minimum time for the goal to be able to be reached. Calculated during planning
 
     double plannerRange_ = 1.0;
-    double solveTime_ = 2.0;
+    double solveTime_ = 10.0;
 
     std::string filename_;
     std::string delim_ = ",";
@@ -62,6 +62,8 @@ private:
                 return std::make_tuple(x, y);
             }, 1.5, 1.5, 0.5, 0.25}
     };
+
+    void writePathToCSV(const ob::PathPtr &pathPtr);
 
 };
 }

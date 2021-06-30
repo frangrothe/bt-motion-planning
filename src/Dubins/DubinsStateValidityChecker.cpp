@@ -4,7 +4,7 @@
 
 #include "DubinsStateValidityChecker.h"
 
-#include <utility>
+
 
 
 namespace dubins {
@@ -31,6 +31,21 @@ bool DubinsStateValidityChecker::isValid(const ompl::base::State *state) const {
 //        if (x >= xlb && x <= xub && y >= ylb && y <= yub) return false;
 //    }
 
-    return true;
+//    double x = state->as<ob::CompoundState>()->as<ob::SE2StateSpace::StateType>(0)->getX();
+//    double y = state->as<ob::CompoundState>()->as<ob::SE2StateSpace::StateType>(0)->getY();
+//    double t = state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+
+
+    return isInBounds(state);
+}
+
+bool DubinsStateValidityChecker::isInBounds(const ompl::base::State *state) const {
+    bool inTimeBound = si_->getStateSpace().get()->as<space_time::AnimationStateSpace>()->getTimeComponent()->satisfiesBounds(
+            state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1));
+    bool inSpaceBounds = si_->getStateSpace().get()->as<space_time::AnimationStateSpace>()->getSpaceComponent()
+            ->as<ob::SE2StateSpace>()->as<ob::RealVectorStateSpace>(0)->satisfiesBounds(
+                    state->as<ob::CompoundState>()->as<ob::SE2StateSpace::StateType>(0)->as<ob::RealVectorStateSpace::StateType>(0));
+
+    return inTimeBound && inSpaceBounds;
 }
 }

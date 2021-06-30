@@ -14,47 +14,30 @@ struct Constraint {
 
 public:
     Constraint(MoveFunc mf, double startX, double startY, double widthX = 0.1, double widthY = 0.1) :
-            startX_(startX), startY_(startY), widthX_(widthX), widthY_(widthY), moveFunc_(mf) {};
+            startX_(startX), startY_(startY), width_(widthX), height_(widthY), moveFunc_(mf) {};
 
-    std::tuple<double, double, double, double> getBoundsForTime (double t) const{
+    std::tuple<double, double, double, double> getBoundsForTime (double t) const {
         double x, y;
         std::tie(x, y) = moveFunc_(startX_, startY_, t);
-        return checkBounds(x - widthX_, x + widthX_, y - widthY_, y + widthY_);
+        return std::make_tuple(x - width_ / 2, x + width_ / 2, y - height_ / 2, y + height_ / 2);
     }
 
-    void setBounds(double xLow, double xHigh, double yLow, double yHigh) {
-        xBoundLow_ = xLow;
-        xBoundHigh_ = xHigh;
-        yBoundLow_ = yLow;
-        yBoundHigh_ = yHigh;
+    // returns true, if the two boxes collide
+    bool checkAABBCollision(double aMinX, double aMaxX, double aMinY, double aMaxY, double t) const {
+        double bMinX, bMaxX, bMinY, bMaxY;
+        std::tie(bMinX, bMaxX, bMinY, bMaxY) = getBoundsForTime(t);
+        return (aMinX <= bMaxX && aMaxX >= bMinX ) &&
+                (aMinY <= bMaxY && aMaxY >= bMinY);
     }
 
 private:
-    double xBoundLow_ = -std::numeric_limits<double>::infinity();
-    double xBoundHigh_ = std::numeric_limits<double>::infinity();
-    double yBoundLow_ = -std::numeric_limits<double>::infinity();
-    double yBoundHigh_ = std::numeric_limits<double>::infinity();
 
     double startX_;
     double startY_;
 
-    double widthX_;
-    double widthY_;
+    double width_; // total width or x-axis length
+    double height_; // total height or y-axis length
     MoveFunc moveFunc_;
-
-    std::tuple<double, double, double, double> checkBounds (double xLow, double xHigh, double yLow, double yHigh) const{
-        xLow = xLow < xBoundLow_ ? xBoundLow_ : xLow;
-        xLow = xLow > xBoundHigh_ ? xBoundHigh_ : xLow;
-        xHigh = xHigh < xBoundLow_ ? xBoundLow_ : xHigh;
-        xHigh = xHigh > xBoundHigh_ ? xBoundHigh_ : xHigh;
-
-        yLow = yLow < yBoundLow_ ? yBoundLow_ : yLow;
-        yLow = yLow > yBoundHigh_ ? yBoundHigh_ : yLow;
-        yHigh = yHigh < yBoundLow_ ? yBoundLow_ : yHigh;
-        yHigh = yHigh > yBoundHigh_ ? yBoundHigh_ : yHigh;
-
-        return std::make_tuple(xLow, xHigh, yLow, yHigh);
-    }
 
 };
 }

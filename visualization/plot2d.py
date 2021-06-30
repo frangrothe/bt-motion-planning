@@ -43,6 +43,11 @@ def plot_motion_plan(filename):
     # draw base graph
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
+    with open('data/' + filename + '/bounds.json') as f:
+        bounds = json.load(f)
+    ax.axes.set_xlim3d(left=bounds['x'][0], right=bounds['x'][1])
+    ax.axes.set_ylim3d(bottom=bounds['y'][0], top=bounds['y'][1])
+    ax.axes.set_zlim3d(bottom=bounds['t'][0], top=bounds['t'][1])
     # draw constraints
     polygons = plot_constraints(filename)
     for poly in polygons:

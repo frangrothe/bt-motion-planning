@@ -34,38 +34,36 @@ public:
 
     void planMotion();
     void test();
+    void loadConfiguration1();
 
 private:
     double xBoundLow_ = 0.0;
-    double xBoundHigh_ = 2.0;
+    double xBoundHigh_ = 1.0;
     double yBoundLow_ = 0.0;
-    double yBoundHigh_ = 2.0;
+    double yBoundHigh_ = 1.0;
     double timeBoundLow_ = 0.0;
-    double timeBoundHigh_ = 2.5;
+    double timeBoundHigh_ = 1.0;
 
     double xStart_ = 0.0;
     double yStart_ = 0.0;
+    double width_ = 0.1;
+    double height_ = 0.1;
     double xGoal_ = 1.0;
     double yGoal_ = 1.0;
     double minTime_ = 0.0; // minimum time for the goal to be able to be reached. Calculated during planning
 
-//    std::vector<Constraint> constraints_ {
-//            {0.4, 0.8, 0.8, 1.2},
-//            {0.05, 0.15, 0.3, 0.6}
-//    };
+    std::vector<Constraint> constraints_{};
 
-    std::vector<Constraint> constraints_{
-            // Movement between x = 0 and x = 1
-            {[](double x, double y, double t) {
-                x = x + 0.5 * sin(t * M_PI);
-                return std::make_tuple(x, y);
-            }, 0.5,  0.7,  0.1,  0.1},
-
-            // Static obstacle
-            {[](double x, double y, double t) {
-                return std::make_tuple(x, y);
-            }, 0.35, 0.3, 0.25, 0.25}
-    };
+//    // Movement between x = 0 and x = 1
+//    {[](double x, double y, double t) {
+//            x = x + 0.5 * sin(t * M_PI);
+//            return std::make_tuple(x, y);
+//        }, 0.5,  0.7,  0.1,  0.1},
+//
+//    // Static obstacle
+//    {[](double x, double y, double t) {
+//            return std::make_tuple(x, y);
+//        }, 0.35, 0.3, 0.25, 0.25}
 
 //    // constant acceleration movement
 //    {[](double x, double y, double t) {
@@ -91,6 +89,7 @@ private:
     void writePathToCSV(const ob::PathPtr &pathPtr);
     void writeConstraintsToJSON();
     void writeGoalRegionToCSV();
+    void writeBoundsToJSON();
 
 };
 }

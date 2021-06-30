@@ -133,6 +133,25 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
 
         GrowState gs = growTree(tree, tgi, rmotion);
 
+        /**
+         * Debug Code
+         */
+        auto x = rstate->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
+        auto y = rstate->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[1];
+        auto t = rstate->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+
+        std::cout << "\n\nSAMPLED\nx: " << x << " y: " << y << " t: " << t;
+
+        const char* gsNames[] = {"TRAPPED", "ADVANCED", "REACHED"};
+        std::cout << "\n" << gsNames[gs];
+        if (gs != TRAPPED) {
+            x = tgi.xmotion->state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
+            y = tgi.xmotion->state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[1];
+            t = tgi.xmotion->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+            std::cout << "\nx: " << x << " y: " << y << " t: " << t << std::endl;
+        }
+
+
         if (gs != TRAPPED)
         {
             /* remember which motion was just added */
@@ -146,6 +165,8 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
 
             GrowState gsc = ADVANCED;
             tgi.start = startTree;
+
+            // TODO Endless loop occurs here
             while (gsc == ADVANCED)
                 gsc = growTree(otherTree, tgi, rmotion);
 
@@ -255,9 +276,24 @@ SpaceTimeRRT::GrowState SpaceTimeRRT::growTree(SpaceTimeRRT::TreeData &tree, Spa
     /* assume we can reach the state we go towards */
     bool reach = true;
 
+    auto xNearest = nmotion->state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
+    auto yNearest = nmotion->state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[1];
+    auto tNearest = nmotion->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+
+    auto xGoal = rmotion->state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
+    auto yGoal = rmotion->state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[1];
+    auto tGoal = rmotion->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+
+    auto xAdd = tgi.xstate->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
+    auto yAdd = tgi.xstate->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[1];
+    auto tAdd = tgi.xstate->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+
+
+
     /* find state to add */
     ob::State *dstate = rmotion->state;
     double d = si_->distance(nmotion->state, rmotion->state);
+    double lastAddedDistance = si_->distance(tgi.xstate, rmotion->state);
     if (d > maxDistance_)
     {
         si_->getStateSpace()->interpolate(nmotion->state, rmotion->state, maxDistance_ / d, tgi.xstate);

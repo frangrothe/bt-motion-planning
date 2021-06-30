@@ -66,12 +66,29 @@ void DubinsPlanner::planMotion() {
         std::cout << "\nApproximate Solution: " << (pdef->hasApproximateSolution()? "yes" : "no") << std::endl;
 
 //        writeSamplesToCSV(data);
-//        writePathToCSV(path);
+        writePathToCSV(path);
 //        writeConstraintsToJSON();
 //        writeGoalRegionToCSV();
     }
     else
         std::cout << "No solution found" << std::endl;
 
+}
+
+void DubinsPlanner::writePathToCSV(const ompl::base::PathPtr &pathPtr) {
+    std::ofstream outfile ("data/" + filename_ + "/path.csv");
+
+    outfile << "x" << delim_ << "y" << delim_ << "yaw" << delim_ << "time\n";
+
+    auto path = pathPtr->as<og::PathGeometric>();
+    for (auto state : path->getStates()) {
+        double x = state->as<ob::CompoundState>()->as<ob::SE2StateSpace::StateType>(0)->getX();
+        double y = state->as<ob::CompoundState>()->as<ob::SE2StateSpace::StateType>(0)->getY();
+        double yaw = state->as<ob::CompoundState>()->as<ob::SE2StateSpace::StateType>(0)->getYaw();
+        double t = state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+        outfile << x << delim_ << y << delim_ << yaw << delim_ << t << "\n";
+    }
+
+    outfile.close();
 }
 }

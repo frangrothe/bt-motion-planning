@@ -25,10 +25,15 @@ public:
     Time2DStateValidityChecker(const ompl::base::SpaceInformationPtr &si,
                                   std::vector<Constraint> constraints);
 
+    Time2DStateValidityChecker(const ompl::base::SpaceInformationPtr &si, std::vector<Constraint> constraints,
+                               double agentWidth, double agentHeight);
+
     bool isValid(const ompl::base::State *state) const override;
 
 private:
     std::vector<Constraint> constraints_;
+    double agentWidth_ = 0.1;
+    double agentHeight_ = 0.1;
 };
 }
 

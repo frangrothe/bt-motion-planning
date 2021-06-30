@@ -47,6 +47,9 @@ bool DubinsMotionValidator::checkMotion(const ompl::base::State *s1, const ompl:
 
         /* temporary storage for the checked state */
         ob::State *test = si_->allocState();
+        auto *ctest = dynamic_cast<ob::CompoundState *>(test);
+        const auto *cfrom = dynamic_cast<const ob::CompoundState *>(s1);
+        const auto *cto = dynamic_cast<const ob::CompoundState *>(s2);
 
         /* repeatedly subdivide the path segment in the middle (and check the middle) */
         while (!pos.empty())
@@ -54,7 +57,13 @@ bool DubinsMotionValidator::checkMotion(const ompl::base::State *s1, const ompl:
             std::pair<int, int> x = pos.front();
 
             int mid = (x.first + x.second) / 2;
-            stateSpace_->interpolate(s1, s2, (double)mid / (double)nd, firstTime, path, test);
+//            stateSpace_->interpolate(s1, s2, (double)mid / (double)nd, firstTime, path, test);
+            si_->getStateSpace().get()->as<space_time::AnimationStateSpace>()->getSpaceComponent()->as<ob::DubinsStateSpace>()
+                    ->interpolate(cfrom->components[0], cto->components[0], (double)mid / (double)nd,
+                                  firstTime, path, ctest->components[0]);
+            si_->getStateSpace().get()->as<space_time::AnimationStateSpace>()->getTimeComponent()
+                    ->interpolate(cfrom->components[1], cto->components[1], (double)mid / (double)nd,
+                                  ctest->components[1]);
 
             if (!si_->isValid(test))
             {
@@ -70,7 +79,7 @@ bool DubinsMotionValidator::checkMotion(const ompl::base::State *s1, const ompl:
                 pos.emplace(mid + 1, x.second);
         }
 
-//        si_->freeState(test);
+        si_->freeState(test);
     }
 
     if (result)

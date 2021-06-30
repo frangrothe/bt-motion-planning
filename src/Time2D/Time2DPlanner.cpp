@@ -22,14 +22,10 @@ void Time2DPlanner::planMotion() {
     bounds.setHigh(1, yBoundHigh_);
 
     vectorSpace->setBounds(bounds);
-//    stateSpace->getSpaceComponent()->as<ob::RealVectorStateSpace>()->setBounds(bounds);
     stateSpace->setTimeBounds(timeBoundLow_, timeBoundHigh_);
-    for (auto &c : constraints_) {
-        c.setBounds(xBoundLow_, xBoundHigh_, yBoundLow_, yBoundHigh_);
-    }
 
     ob::SpaceInformationPtr si = std::make_shared<ob::SpaceInformation>(stateSpace);
-    si->setStateValidityChecker(std::make_shared<Time2DStateValidityChecker>(si, constraints_));
+    si->setStateValidityChecker(std::make_shared<Time2DStateValidityChecker>(si, constraints_, width_, height_));
     si->setMotionValidator(std::make_shared<Time2DMotionValidator>(si, 2, vMax_));
 
     //(2) Problem Definition Ptr
@@ -43,8 +39,8 @@ void Time2DPlanner::planMotion() {
     pdef->setGoal(std::make_shared<Time2DGoalRegion>(si, xGoal_, yGoal_, minTime_, timeBoundHigh_));
 
     //(3) Planner
-//    auto planner(std::make_shared<og::RRTConnect>(si));
-    auto planner(std::make_shared<space_time::SpaceTimeRRT>(si));
+    auto planner(std::make_shared<og::RRTConnect>(si));
+//    auto planner(std::make_shared<space_time::SpaceTimeRRT>(si));
     planner->setRange(plannerRange_);
     planner->setProblemDefinition(pdef);
     planner->setup();
@@ -71,10 +67,53 @@ void Time2DPlanner::planMotion() {
         writePathToCSV(path);
         writeConstraintsToJSON();
         writeGoalRegionToCSV();
+        writeBoundsToJSON();
     }
     else
         std::cout << "No solution found" << std::endl;
 
+}
+
+void Time2DPlanner::loadConfiguration1() {
+
+    xBoundLow_ = 0.0;
+    xBoundHigh_ = 10.0;
+    yBoundLow_ = 0.0;
+    yBoundHigh_ = 10.0;
+    timeBoundLow_ = 0.0;
+    timeBoundHigh_ = 30.0;
+
+    xStart_ = 0.5;
+    yStart_ = 5.0;
+    xGoal_ = 9.5;
+    yGoal_ = 5.0;
+    width_ = 0.25;
+    height_ = 0.25;
+
+    // 4 rectangles moving for the first 10 seconds. The 1st and 3rd moving up, the 2nd and 4th moving down.
+    constraints_ = {
+//            Constraint{[](double x, double y, double t) {
+//                if (t > 10) t = 10.0;
+//                return std::make_tuple(x, y + 0.5 * t);
+//            }, 2.0, 3.0, 0.5, 2.0}
+            Constraint{[](double x, double y, double t) {
+                if (t > 10) t = 10.0;
+                return std::make_tuple(x, y - 0.5 * t);
+            }, 4.0,  8.0,  0.5,  2.0},
+            Constraint{[](double x, double y, double t) {
+                if (t > 10) t = 10.0;
+                return std::make_tuple(x, y + 0.5 * t);
+            }, 6.0,  1.0,  0.5,  2.0},
+            Constraint{[](double x, double y, double t) {
+                if (t > 10) t = 10.0;
+                if (t <= 1) return std::make_tuple(x, y);
+                return std::make_tuple(x, y - 0.5 * (t - 1));
+            }, 8.0,  9.0,  0.5,  2.0}
+    };
+
+    vMax_ = 1.0;
+    solveTime_ = 1.0;
+    plannerRange_ = 0.5;
 }
 
 void Time2DPlanner::test() {
@@ -138,10 +177,9 @@ void Time2DPlanner::writeConstraintsToJSON() {
     json j;
 
     int n = 20; // number of time samples to generate planes for visualization
-    double tLow = 0.0;
-    double tHigh = 2.5;
+    double tLow = timeBoundLow_;
 
-    double tDiff = (tHigh - tLow) / (n - 1);
+    double tDiff = (timeBoundHigh_ - timeBoundLow_) / (n - 1);
     std::vector<double> ts(n);
     std::generate(ts.begin(), ts.end(), [i = 0, &tLow, &tDiff] () mutable { return tLow + i++ * tDiff; });
 
@@ -176,5 +214,17 @@ void Time2DPlanner::writeGoalRegionToCSV() {
     outfile << xGoal_ << delim_ << yGoal_ << delim_ << timeBoundLow_ << delim_ << timeBoundHigh_ << "\n";
 
     outfile.close();
+}
+
+void Time2DPlanner::writeBoundsToJSON() {
+    using json = nlohmann::json;
+    json j;
+    j["x"] = {xBoundLow_, xBoundHigh_};
+    j["y"] = {yBoundLow_, yBoundHigh_};
+    j["t"] = {timeBoundLow_, timeBoundHigh_};
+
+    // write prettified JSON to another file
+    std::ofstream outfile("data/" + filename_ + "/bounds.json");
+    outfile << std::setw(4) << j << std::endl;
 }
 }

@@ -6,8 +6,10 @@
 #define BT_ROBOTICS_DUBINSSTATEVALIDITYCHECKER_H
 
 #include <vector>
+#include <utility>
 
 #include <ompl/base/StateValidityChecker.h>
+#include <ompl/base/SpaceInformation.h>
 #include <ompl/base/spaces/RealVectorStateSpace.h>
 #include <ompl/base/spaces/DubinsStateSpace.h>
 #include <ompl/base/spaces/TimeStateSpace.h>
@@ -27,6 +29,7 @@ public:
 
 private:
     std::vector<DubinsConstraint> constraints_;
+    bool isInBounds(const ompl::base::State *state) const;
 };
 }
 
