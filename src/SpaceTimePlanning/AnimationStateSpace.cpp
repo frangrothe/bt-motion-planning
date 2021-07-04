@@ -26,16 +26,22 @@ double AnimationStateSpace::distance(const ompl::base::State *state1, const ompl
 
 }
 
+/*
+ * Direction-independent distance in space
+ */
 double AnimationStateSpace::distanceSpace(const ompl::base::State *state1, const ompl::base::State *state2) const {
-    const auto *cstate1 = dynamic_cast<const ob::CompoundState *>(state1);
-    const auto *cstate2 = dynamic_cast<const ob::CompoundState *>(state2);
+    const auto *cstate1 = static_cast<const ob::CompoundState *>(state1);
+    const auto *cstate2 = static_cast<const ob::CompoundState *>(state2);
 
     return components_[0]->distance(cstate1->components[0], cstate2->components[0]);
 }
 
+/*
+ * Direction-independent distance in time
+ */
 double AnimationStateSpace::distanceTime(const ompl::base::State *state1, const ompl::base::State *state2) const {
-    const auto *cstate1 = dynamic_cast<const ob::CompoundState *>(state1);
-    const auto *cstate2 = dynamic_cast<const ob::CompoundState *>(state2);
+    const auto *cstate1 = static_cast<const ob::CompoundState *>(state1);
+    const auto *cstate2 = static_cast<const ob::CompoundState *>(state2);
 
     return components_[1]->distance(cstate1->components[1], cstate2->components[1]);
 }
@@ -63,5 +69,12 @@ ob::StateSpacePtr AnimationStateSpace::getSpaceComponent() {
 
 ob::TimeStateSpace * AnimationStateSpace::getTimeComponent() {
     return components_[1]->as<ob::TimeStateSpace>();
+}
+
+/*
+ * No Metric State Space, as the triangle inequality is not satisfied
+ */
+bool AnimationStateSpace::isMetricSpace() const {
+    return false;
 }
 }

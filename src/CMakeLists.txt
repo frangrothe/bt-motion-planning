@@ -39,5 +39,5 @@ add_executable(bt_robotics
         Dubins/DubinsMotionValidator.cpp Dubins/DubinsMotionValidator.h
         Dubins/goals/DubinsGoalRegion.cpp Dubins/goals/DubinsGoalRegion.h
         Dubins/goals/DubinsGoalSampler.cpp Dubins/goals/DubinsGoalSampler.h
-        Dubins/DubinsConstraint.h)
+        Dubins/DubinsConstraint.h Time1D/goals/VectorSpaceGoalRegion.cpp Time1D/goals/VectorSpaceGoalRegion.h)
 

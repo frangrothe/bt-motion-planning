@@ -47,7 +47,8 @@ void Time1DPlanner::planMotion() {
 
     minTime_ = (xGoalRegionLeft_ - xStart_) / vMax_; // minimum time at which the goal can be reached
     pdef->addStartState(start);
-    pdef->setGoal(std::make_shared<Time1DGoalRegion>(si, xGoalRegionLeft_, xGoalRegionRight_, minTime_, timeBoundHigh_));
+//    pdef->setGoal(std::make_shared<Time1DGoalRegion>(si, xGoalRegionLeft_, xGoalRegionRight_, minTime_, timeBoundHigh_));
+    pdef->setGoal(std::make_shared<VectorSpaceGoalRegion>(si, xGoalRegionLeft_, xGoalRegionRight_));
 
     //(3) Planner
 //    auto planner(std::make_shared<og::RRTConnect>(si));

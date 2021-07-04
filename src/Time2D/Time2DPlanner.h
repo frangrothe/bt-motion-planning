@@ -35,6 +35,7 @@ public:
     void planMotion();
     void test();
     void loadConfiguration1();
+    void loadConfiguration2();
 
 private:
     double xBoundLow_ = 0.0;
@@ -80,6 +81,7 @@ private:
 
     double vMax_ = 1.0; // 1 m/s
     double solveTime_ = 1.0; // in seconds
+    double timeWeight_ = 0.5; // weight of time for the distance calculation, ~ [0,1]
     double plannerRange_ = 0.5;
 
     std::string filename_;

@@ -20,6 +20,7 @@
 #include "Time1DStateValidityChecker.h"
 #include "Time1DMotionValidator.h"
 #include "Time1DGoalRegion.h"
+#include "goals/VectorSpaceGoalRegion.h"
 
 #include "../SpaceTimePlanning/SpaceTimeRRT.h"
 #include "../SpaceTimePlanning/AnimationStateSpace.h"
@@ -39,16 +40,18 @@ private:
     double xBoundLow_ = 0.0;
     double xBoundHigh_ = 2.0;
     double timeBoundLow_ = 0.0;
-    double timeBoundHigh_ = 2.5;
+    double timeBoundHigh_ = 3.0;
 
     double xStart_ = 0.0;
     double xGoalRegionLeft_ = 1.0;
-    double xGoalRegionRight_ = 1.1;
+    double xGoalRegionRight_ = 1.01;
     double minTime_ = 0.0; // minimum time for the goal to be able to be reached. Calculated during planning
 
     std::vector<Constraint> constraints_ {
-            {0.4, 0.8, 0.8, 1.2},
-            {0.05, 0.15, 0.3, 0.6}
+            {0.05, 0.15, 0.16, 0.35},
+            {0.5, 0.6, 0.51, 0.6},
+            {0.5, 0.6, 0.71, 0.8},
+            {0.5, 0.6, 1.01, 1.1}
     };
     double vMax_ = 1.0; // 1 m/s
     double timeWeight_ = 0.5; // compared to distance weight used in distance function. [0,1]

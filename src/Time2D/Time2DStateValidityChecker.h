@@ -20,20 +20,18 @@ namespace time_2d {
 
 class Time2DStateValidityChecker : public ob::StateValidityChecker {
 public:
-    explicit Time2DStateValidityChecker(const ompl::base::SpaceInformationPtr &si);
-
-    Time2DStateValidityChecker(const ompl::base::SpaceInformationPtr &si,
-                                  std::vector<Constraint> constraints);
-
-    Time2DStateValidityChecker(const ompl::base::SpaceInformationPtr &si, std::vector<Constraint> constraints,
-                               double agentWidth, double agentHeight);
+    Time2DStateValidityChecker(const ompl::base::SpaceInformationPtr &si, ob::RealVectorBounds bounds, std::vector<Constraint> constraints,
+                               double agentWidth = 0.1, double agentHeight = 0.1);
 
     bool isValid(const ompl::base::State *state) const override;
 
 private:
     std::vector<Constraint> constraints_;
-    double agentWidth_ = 0.1;
-    double agentHeight_ = 0.1;
+    ob::RealVectorBounds bounds_;
+    double agentWidth_;
+    double agentHeight_;
+
+    bool isInBounds(double minX, double maxX, double minY, double maxY) const;
 };
 }
 

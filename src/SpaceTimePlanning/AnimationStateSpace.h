@@ -35,6 +35,8 @@ public:
     ob::StateSpacePtr getSpaceComponent();
     ob::TimeStateSpace * getTimeComponent();
 
+    bool isMetricSpace() const override;
+
 protected:
     double vMax_; // maximum velocity
 };

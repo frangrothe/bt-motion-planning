@@ -12,7 +12,7 @@ void Time2DPlanner::planMotion() {
 
     //(1) Define State Space
     auto vectorSpace = std::make_shared<ob::RealVectorStateSpace>(2);
-    auto stateSpace = std::make_shared<space_time::AnimationStateSpace>(vectorSpace);
+    auto stateSpace = std::make_shared<space_time::AnimationStateSpace>(vectorSpace, vMax_, timeWeight_);
 
     // Set the bounds
     ob::RealVectorBounds bounds(2);
@@ -25,7 +25,7 @@ void Time2DPlanner::planMotion() {
     stateSpace->setTimeBounds(timeBoundLow_, timeBoundHigh_);
 
     ob::SpaceInformationPtr si = std::make_shared<ob::SpaceInformation>(stateSpace);
-    si->setStateValidityChecker(std::make_shared<Time2DStateValidityChecker>(si, constraints_, width_, height_));
+    si->setStateValidityChecker(std::make_shared<Time2DStateValidityChecker>(si, bounds, constraints_, width_, height_));
     si->setMotionValidator(std::make_shared<Time2DMotionValidator>(si, 2, vMax_));
 
     //(2) Problem Definition Ptr
@@ -39,8 +39,8 @@ void Time2DPlanner::planMotion() {
     pdef->setGoal(std::make_shared<Time2DGoalRegion>(si, xGoal_, yGoal_, minTime_, timeBoundHigh_));
 
     //(3) Planner
-    auto planner(std::make_shared<og::RRTConnect>(si));
-//    auto planner(std::make_shared<space_time::SpaceTimeRRT>(si));
+//    auto planner(std::make_shared<og::RRTConnect>(si));
+    auto planner(std::make_shared<space_time::SpaceTimeRRT>(si));
     planner->setRange(plannerRange_);
     planner->setProblemDefinition(pdef);
     planner->setup();
@@ -92,10 +92,10 @@ void Time2DPlanner::loadConfiguration1() {
 
     // 4 rectangles moving for the first 10 seconds. The 1st and 3rd moving up, the 2nd and 4th moving down.
     constraints_ = {
-//            Constraint{[](double x, double y, double t) {
-//                if (t > 10) t = 10.0;
-//                return std::make_tuple(x, y + 0.5 * t);
-//            }, 2.0, 3.0, 0.5, 2.0}
+            Constraint{[](double x, double y, double t) {
+                if (t > 10) t = 10.0;
+                return std::make_tuple(x, y + 0.5 * t);
+            }, 2.0, 3.0, 0.5, 2.0},
             Constraint{[](double x, double y, double t) {
                 if (t > 10) t = 10.0;
                 return std::make_tuple(x, y - 0.5 * t);
@@ -113,6 +113,44 @@ void Time2DPlanner::loadConfiguration1() {
 
     vMax_ = 1.0;
     solveTime_ = 1.0;
+    timeWeight_ = 0.5;
+    plannerRange_ = 0.5;
+}
+
+void Time2DPlanner::loadConfiguration2() {
+
+    xBoundLow_ = -1.0;
+    xBoundHigh_ = 21.0;
+    yBoundLow_ = 0.0;
+    yBoundHigh_ = 2.0;
+    timeBoundLow_ = 0.0;
+    timeBoundHigh_ = 15.0;
+
+    xStart_ = 1.0;
+    yStart_ = 1.5;
+    xGoal_ = 19.0;
+    yGoal_ = 1.5;
+    width_ = 2.0;
+    height_ = 0.8;
+
+    // 2 rectangles moving, the first from left to right in front of the agent,
+    // the 2nd in the opposite direction towards the agent
+    double xgoal = xGoal_;
+    double xstart = xStart_;
+    constraints_ = {
+            Constraint{[xgoal](double x, double y, double t) {
+                auto newX = std::min(xgoal, x + t);
+                return std::make_tuple(newX, y);
+            }, 4.0, 1.5, 2.0, 0.8},
+            Constraint{[xstart](double x, double y, double t) {
+                auto newX = std::max(xstart, x - t);
+                return std::make_tuple(newX, y);
+            }, 19.0, 0.5, 2.0, 0.8}
+    };
+
+    vMax_ = 2.5;
+    solveTime_ = 2.0;
+    timeWeight_ = 0.5;
     plannerRange_ = 0.5;
 }
 
