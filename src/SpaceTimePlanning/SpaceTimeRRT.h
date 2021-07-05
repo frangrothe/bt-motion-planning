@@ -70,8 +70,14 @@ protected:
 
     class ConditionalSampler : public ob::ValidStateSampler
     {
+        static bool goalSetCmp(Motion * a, Motion * b) {
+            return a->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position <
+                   b->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+        }
     public:
-        explicit ConditionalSampler(const ompl::base::SpaceInformation *si) : ValidStateSampler(si)
+        ConditionalSampler(const ompl::base::SpaceInformation *si, Motion * &startMotion,
+                                    std::set<Motion *, decltype(&goalSetCmp)> &goalSet) : ValidStateSampler(si),
+                                    startMotion_(startMotion), goalSet_(goalSet)
         {
             name_ = "ConditionalSampler";
         }
@@ -81,14 +87,14 @@ protected:
             while (!validSample) {
                 internalSampler_->sampleUniform(state);
                 // get minimum time, when the state can be reached from the start
-                double leftBound = startState_->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position +
-                                   si_->getStateSpace()->template as<space_time::AnimationStateSpace>()->timeToCoverDistance(state, startState_);
+                double leftBound = startMotion_->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position +
+                                   si_->getStateSpace()->as<space_time::AnimationStateSpace>()->timeToCoverDistance(state, startMotion_->state);
 
                 // get maximum time, at which any goal can be reached from the state
                 double rightBound = std::numeric_limits<double>::min();
-                for (auto goal : goalStates_) {
-                    double t = goal->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position -
-                               si_->getStateSpace()->template as<space_time::AnimationStateSpace>()->timeToCoverDistance(state, goal);
+                for (auto goal : goalSet_) {
+                    double t = goal->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position -
+                               si_->getStateSpace()->as<space_time::AnimationStateSpace>()->timeToCoverDistance(goal->state, state);
                     if (t > rightBound) {
                         rightBound = t;
                     }
@@ -107,28 +113,13 @@ protected:
             throw ompl::Exception("ConditionalSampler::sampleNear", "not implemented");
         }
 
-        void addStartState(ob::State* s) {startState_ = s;}
-        void addGoalState(ob::State* s) {goalStates_.push_back(s);}
-
-        void clear()
-        {
-            if (startState_ != nullptr)
-            {
-                si_->freeState(startState_);
-            }
-
-            if (!goalStates_.empty())
-            {
-                for (auto s : goalStates_) {
-                    si_->freeState(s);
-                }
-            }
-        }
-
     private:
         ob::StateSamplerPtr internalSampler_ = si_->allocStateSampler();
-        ob::State* startState_;
-        std::vector<ob::State*> goalStates_;
+
+        /** References to the start state and goal states */
+        Motion * &startMotion_;
+
+        std::set<Motion *, decltype(&goalSetCmp)> &goalSet_;
 
         /** \brief The random number generator */
         ompl::RNG rng_;
@@ -193,6 +184,8 @@ protected:
     /** \brief The current best solution path with respect to shortest time. */
     ob::PathPtr bestSolution_;
 
+    int numSolutions = 0;
+
     /** \brief Minimum Time at which any goal can be reached, if moving on a straight line. */
     double minimumTime_ = std::numeric_limits<double>::infinity();
 
@@ -238,9 +231,10 @@ protected:
     /** \brief Adds given all descendants of the given motion to given tree and checks whether one of the added motions is the goal motion. */
     static void addDescendants(Motion *m, const TreeData &tree, Motion *goalMotion, bool *addedGoalMotion);
 
-    void constructSolution(Motion *startMotion, Motion *goalMotion);
+    void constructSolution(Motion *startMotion, Motion *goalMotion, bool recursiveCall);
 
-    void writeSamplesToCSV(const std::string& num);
+    void writeSamplesToCSV(const std::string& type);
+    void writeSolutionToCSV();
 
     /** \brief The random number generator */
     ompl::RNG rng_;

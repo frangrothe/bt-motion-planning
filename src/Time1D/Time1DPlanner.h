@@ -55,7 +55,7 @@ private:
     };
     double vMax_ = 1.0; // 1 m/s
     double timeWeight_ = 0.5; // compared to distance weight used in distance function. [0,1]
-    double solveTime_ = 1.0; // in seconds
+    double solveTime_ = 2.0; // in seconds
     double plannerRange_ = 0.2;
 
     std::string filename_;

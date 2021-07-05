@@ -10,8 +10,8 @@
 namespace space_time {
 
 
-SpaceTimeRRT::SpaceTimeRRT(const ompl::base::SpaceInformationPtr &si) : Planner(si, "SpaceTimeRRT"),
-                                                                        sampler_(&(*si)), goalSet_(&goalSetCmp){
+SpaceTimeRRT::SpaceTimeRRT(const ompl::base::SpaceInformationPtr &si) : Planner(si, "SpaceTimeRRT"), goalSet_(&goalSetCmp),
+                                                                        sampler_(&(*si), startMotion_, goalSet_) {
 
     Planner::declareParam<double>("range", this, &SpaceTimeRRT::setRange, &SpaceTimeRRT::getRange, "0.:1.:10000.");
     connectionPoint_ = std::make_pair<ob::State *, ob::State *>(nullptr, nullptr);
@@ -47,8 +47,6 @@ void SpaceTimeRRT::freeMemory() {
         }
     }
 
-    sampler_.clear();
-
     if (tempState_) si_->freeState(tempState_);
 }
 
@@ -74,7 +72,6 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
 
         auto s = si_->allocState();
         si_->copyState(s, st);
-        sampler_.addStartState(s);
     }
 
     if (tStart_->size() == 0)
@@ -122,7 +119,6 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
 
                 auto s = si_->allocState();
                 si_->copyState(s, st);
-                sampler_.addGoalState(s);
 
                 minimumTime_ = std::min(minimumTime_, si_->getStateSpace()
                 ->as<space_time::AnimationStateSpace>()->timeToCoverDistance(startMotion_->state, st));
@@ -176,10 +172,10 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
                     startMotion = startMotion->parent;
                 else
                     goalMotion = goalMotion->parent;
-                constructSolution(startMotion, goalMotion);
+                constructSolution(startMotion, goalMotion, false);
                 solved = true;
                 if (upperTimeBound_ - minimumTime_ <= epsilon_) break; // optimal solution is found
-                break;
+                // continue to look for solutions with the narrower time bound until the termination condition is met
             }
             else
             {
@@ -272,8 +268,9 @@ SpaceTimeRRT::GrowState SpaceTimeRRT::growTree(SpaceTimeRRT::TreeData &tree, Spa
     return reach ? REACHED : ADVANCED;
 }
 
-void SpaceTimeRRT::constructSolution(SpaceTimeRRT::Motion *startMotion, SpaceTimeRRT::Motion *goalMotion) {
+void SpaceTimeRRT::constructSolution(SpaceTimeRRT::Motion *startMotion, SpaceTimeRRT::Motion *goalMotion, bool recursiveCall) {
 
+    numSolutions++;
     connectionPoint_ = std::make_pair(startMotion->state, goalMotion->state);
 
     /* construct the solution path */
@@ -295,10 +292,16 @@ void SpaceTimeRRT::constructSolution(SpaceTimeRRT::Motion *startMotion, SpaceTim
 
     auto path(std::make_shared<og::PathGeometric>(si_));
     path->getStates().reserve(mpath1.size() + mpath2.size());
-    for (int i = mpath1.size() - 1; i >= 0; --i)
+    for (int i = mpath1.size() - 1; i >= 0; --i) {
         path->append(mpath1[i]->state);
-    for (auto &i : mpath2)
+    }
+    for (auto &i : mpath2) {
         path->append(i->state);
+    }
+
+
+    // write to csv for visualization
+    writeSamplesToCSV("prePruning");
 
     bestSolution_ = path;
     auto reachedGaol = path->getState(path->getStateCount() - 1);
@@ -312,10 +315,21 @@ void SpaceTimeRRT::constructSolution(SpaceTimeRRT::Motion *startMotion, SpaceTim
     numStartPruned = pruneStartTree();
     std::tie(numGoalPruned, solvedAgain) = pruneGoalTree(goalMotion);
 
-    std::cout << "\n" << numStartPruned << " START STATES PRUNED";
-    std::cout << "\n" << numGoalPruned << " GOAL STATES PRUNED";
+    std::cout << "\nFound Solution for t = " << bestTime << ". New time bound = " << upperTimeBound_;
+//    std::cout << "\n" << numStartPruned << " START STATES PRUNED";
+//    std::cout << "\n" << numGoalPruned << " GOAL STATES PRUNED";
+    int numGoal = 1;
+    for (auto &g : goalSet_) {
+        auto gx = g->state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
+        auto gt = g->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+        std::cout << "\nGoal " << numGoal++ << " - x: " << gx << " t: " << gt;
+    }
+
+    writeSolutionToCSV();
+    writeSamplesToCSV("afterPruning");
+
     // loop as long as a new solution is found by rewiring the goal tree
-    if (solvedAgain) constructSolution(startMotion, goalMotion);
+    if (solvedAgain) constructSolution(startMotion, goalMotion, true);
 }
 
 int SpaceTimeRRT::pruneStartTree() {
@@ -418,8 +432,14 @@ std::tuple<int, bool> SpaceTimeRRT::pruneGoalTree(Motion * goalMotion) {
                         // connection successful, add all descendants and check if the goal motion is added.
                         // In that case, the problem is solved again for an improved time
                         if (gsc == REACHED) {
+                            // the motion was copied and added to the tree with a new parent
+                            // adjust children and parent pointers
+                            tgi.xmotion->children = queue.front()->children;
+                            for (auto &c : tgi.xmotion->children) {
+                                c->parent = tgi.xmotion;
+                            }
                             bool addedGoalMotion = false;
-                            addDescendants(queue.front(), tGoal_, goalMotion, &addedGoalMotion);
+                            addDescendants(tgi.xmotion, tGoal_, goalMotion, &addedGoalMotion);
                             if (addedGoalMotion || queue.front() == goalMotion) solvedAgain = true;
                             addedToTree = true;
                         }
@@ -430,14 +450,14 @@ std::tuple<int, bool> SpaceTimeRRT::pruneGoalTree(Motion * goalMotion) {
                     // add children to queue, so they might be rewired
                     for (auto &c : queue.front()->children)
                         queue.push(c);
-                    // Erase the actual motion
-                    // First free the state
-                    if (queue.front()->state)
-                        si_->freeState(queue.front()->state);
-                    // then delete the pointer
-                    delete queue.front();
-                    numPruned++;
                 }
+                // Erase the actual motion
+                // First free the state
+                if (queue.front()->state)
+                    si_->freeState(queue.front()->state);
+                // then delete the pointer
+                delete queue.front();
+                numPruned++;
 
                 queue.pop();
             }
@@ -519,6 +539,10 @@ void SpaceTimeRRT::setup() {
         tGoal_.reset(new ompl::NearestNeighborsLinear<Motion *>());
     tStart_->setDistanceFunction([this](const Motion *a, const Motion *b) { return distanceFunction(a, b); });
     tGoal_->setDistanceFunction([this](const Motion *a, const Motion *b) { return distanceFunction(a, b); });
+
+    if (si_->getStateSpace()->as<space_time::AnimationStateSpace>()->getTimeComponent()->isBounded()) {
+        upperTimeBound_ = si_->getStateSpace()->as<space_time::AnimationStateSpace>()->getTimeComponent()->getMaxTimeBound();
+    }
 }
 
 void SpaceTimeRRT::removeFromParent(SpaceTimeRRT::Motion *m) {
@@ -544,47 +568,6 @@ void SpaceTimeRRT::addDescendants(SpaceTimeRRT::Motion *m, const SpaceTimeRRT::T
         if (queue.front() == goalMotion) *addedGoalMotion = true;
         queue.pop();
     }
-}
-
-void SpaceTimeRRT::writeSamplesToCSV(const std::string& num) {
-    std::ofstream outfile ("data/debug/samples" + num + ".csv");
-    std::string delim = ",";
-
-    ob::PlannerData data(si_);
-    getPlannerData(data);
-
-    outfile << "x" << delim << "time" << delim << "incoming edge" << delim << "outgoing edges\n";
-
-    for (int i = 0; i < data.numVertices(); ++i) {
-        double x = data.getVertex(i).getState()->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
-//        double y = data.getVertex(i).getState()->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[1];
-        double t = data.getVertex(i).getState()->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
-
-
-        // Get incoming edges for node
-        std::vector< unsigned int > inEdgeIndexes{};
-        data.getIncomingEdges(i, inEdgeIndexes);
-        std::stringstream ssIn;
-        for (auto edgeIndex : inEdgeIndexes) {
-            ssIn << "#" << edgeIndex;
-        }
-        std::string inEdges = inEdgeIndexes.empty()? "#" : ssIn.str();
-
-        // Get outgoing edges for node
-        std::vector< unsigned int > outEdgeIndexes{};
-        data.getEdges(i, outEdgeIndexes);
-        std::stringstream ssOut;
-        for (auto edgeIndex : outEdgeIndexes) {
-            ssOut << "#" << edgeIndex;
-        }
-        std::string outEdges = outEdgeIndexes.empty()? "#" : ssOut.str();
-
-        // write node data to csv
-        outfile << x << delim << t << delim << inEdges << delim << outEdges << "\n";
-
-    }
-
-    outfile.close();
 }
 
 bool SpaceTimeRRT::sampleGoalTime(ob::State * goal) {
@@ -627,5 +610,62 @@ ob::State *SpaceTimeRRT::nextGoal(const ob::PlannerTerminationCondition &ptc) {
     }
 
     return nullptr;
+}
+
+void SpaceTimeRRT::writeSamplesToCSV(const std::string& type) {
+    std::ofstream outfile ("data/debug/" + std::to_string(numSolutions) + type + ".csv");
+    std::string delim = ",";
+
+    ob::PlannerData data(si_);
+    getPlannerData(data);
+
+    outfile << "x" << delim << "time" << delim << "incoming edge" << delim << "start or goal\n";
+
+    for (int i = 0; i < data.numVertices(); ++i) {
+        double x = data.getVertex(i).getState()->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
+//        double y = data.getVertex(i).getState()->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[1];
+        double t = data.getVertex(i).getState()->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+        int startOrGoalTag = data.getVertex(i).getTag();
+
+
+        // Get incoming edges for node
+        std::vector< unsigned int > inEdgeIndexes{};
+        data.getIncomingEdges(i, inEdgeIndexes);
+        std::stringstream ssIn;
+        for (auto edgeIndex : inEdgeIndexes) {
+            ssIn << "#" << edgeIndex;
+        }
+        std::string inEdges = inEdgeIndexes.empty()? "#" : ssIn.str();
+//        std::string startOrGoal = startOrGoalTag == 1 ? "start" : "goal";
+
+        // write node data to csv
+        outfile << x << delim << t << delim << inEdges << delim << startOrGoalTag << "\n";
+
+    }
+
+    outfile.close();
+}
+
+void SpaceTimeRRT::writeSolutionToCSV() {
+    std::ofstream outfile ("data/debug/" + std::to_string(numSolutions) + "path.csv");
+    std::string delim = ",";
+
+    outfile << "x" << delim << "time" << delim << "upper time bound\n";
+
+    bool first = true;
+    auto path = bestSolution_->as<og::PathGeometric>();
+    for (auto state : path->getStates()) {
+        double x = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
+        double t = state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+        if (first) {
+            outfile << x << delim << t << delim << upperTimeBound_ << "\n";
+        }
+        else {
+            outfile << x << delim << t << "\n";
+        }
+        first = false;
+    }
+
+    outfile.close();
 }
 }
