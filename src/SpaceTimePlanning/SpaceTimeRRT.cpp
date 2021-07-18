@@ -2,9 +2,6 @@
 // Created by francesco on 18.06.21.
 //
 
-
-#include <ompl/tools/config/SelfConfig.h>
-#include <fstream>
 #include "SpaceTimeRRT.h"
 
 namespace space_time {
@@ -14,7 +11,6 @@ SpaceTimeRRT::SpaceTimeRRT(const ompl::base::SpaceInformationPtr &si) : Planner(
                                                                         sampler_(&(*si), startMotion_, goalSet_) {
 
     Planner::declareParam<double>("range", this, &SpaceTimeRRT::setRange, &SpaceTimeRRT::getRange, "0.:1.:10000.");
-    connectionPoint_ = std::make_pair<ob::State *, ob::State *>(nullptr, nullptr);
     distanceBetweenTrees_ = std::numeric_limits<double>::infinity();
 }
 
@@ -92,12 +88,15 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
     TreeGrowingInfo tgi;
     tgi.xstate = si_->allocState();
 
+    std::vector<Motion *> nbh;
+
     Motion *approxsol = nullptr;
     double approxdif = std::numeric_limits<double>::infinity();
     auto *rmotion = new Motion(si_);
     ob::State *rstate = rmotion->state;
     bool startTree = true;
     bool solved = false;
+    int numBatchSamples = 0;
 
     while (!ptc)
     {
@@ -105,6 +104,13 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
         tgi.start = startTree;
         startTree = !startTree;
         TreeData &otherTree = startTree ? tStart_ : tGoal_;
+
+        // as long as time is unbounded, double the time bound factor whenever the batch is full.
+        if (!isTimeBounded_ && numBatchSamples >= batchSize_) {
+            timeBoundFactor_*= 2;
+            numBatchSamples = 0;
+            std::cout << "\n\nNew Time Bound Factor: " << timeBoundFactor_;
+        }
 
         if (tGoal_->size() == 0 || goalSet_.size() < tGoal_->size() / 4)
         {
@@ -122,6 +128,7 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
 
                 minimumTime_ = std::min(minimumTime_, si_->getStateSpace()
                 ->as<space_time::AnimationStateSpace>()->timeToCoverDistance(startMotion_->state, st));
+                numBatchSamples++;
             }
 
             if (tGoal_->size() == 0)
@@ -133,23 +140,64 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
 
         /* sample random state */
         sampler_.sample(rstate);
+        numBatchSamples++;
 
-        GrowState gs = growTree(tree, tgi, rmotion);
+        // EXTEND
+        GrowState gs = growTree(tree, tgi, rmotion, nbh, false);
         if (gs != TRAPPED)
         {
             /* remember which motion was just added */
             Motion *addedMotion = tgi.xmotion;
+            Motion *startMotion;
+            Motion *goalMotion;
 
-            /* attempt to connect trees */
+            /* rewire the goal tree */
+            bool newSolution = false;
+            if (!tgi.start && rewireState_ != OFF) {
+                newSolution = rewireGoalTree(addedMotion);
+                if (newSolution) {
+                    // find connection point
+                    std::queue<Motion*> queue;
+                    queue.push(addedMotion);
+                    while (!queue.empty()) {
+                        if (queue.front()->connectionPoint != nullptr) {
+                            goalMotion = queue.front();
+                            startMotion = queue.front()->connectionPoint;
+                            break;
+                        }
+                        else {
+                            for (Motion* c : queue.front()->children)
+                                queue.push(c);
+                        }
+                        queue.pop();
+                    }
+                }
+            }
 
             /* if reached, it means we used rstate directly, no need to copy again */
             if (gs != REACHED)
                 si_->copyState(rstate, tgi.xstate);
 
-            GrowState gsc = ADVANCED;
             tgi.start = startTree;
 
-            while (gsc == ADVANCED) gsc = growTree(otherTree, tgi, rmotion);
+            /* attempt to connect trees, if rewiring didn't find a new solution */
+            // CONNECT
+            if (!newSolution) {
+                GrowState gsc = growTree(otherTree, tgi, rmotion, nbh, true);
+                if (gsc == REACHED) {
+                    newSolution = true;
+                    startMotion = startTree ? tgi.xmotion : addedMotion;
+                    goalMotion = startTree ? addedMotion : tgi.xmotion;
+                    // it must be the case that either the start tree or the goal tree has made some progress
+                    // so one of the parents is not nullptr. We go one step 'back' to avoid having a duplicate state
+                    // on the solution path
+                    if (startMotion->parent != nullptr)
+                        startMotion = startMotion->parent;
+                    else
+                        goalMotion = goalMotion->parent;
+                }
+            }
+
 
             /* update distance between trees */
             const double newDist = tree->getDistanceFunction()(addedMotion, otherTree->nearest(addedMotion));
@@ -159,20 +207,11 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
                 // OMPL_INFORM("Estimated distance to go: %f", distanceBetweenTrees_);
             }
 
-            Motion *startMotion = startTree ? tgi.xmotion : addedMotion;
-            Motion *goalMotion = startTree ? addedMotion : tgi.xmotion;
-
             /* if we connected the trees in a valid way (start and goal pair is valid)*/
-            if (gsc == REACHED && goal->isStartGoalPairValid(startMotion->root, goalMotion->root))
+            if (newSolution && goal->isStartGoalPairValid(startMotion->root, goalMotion->root))
             {
-                // it must be the case that either the start tree or the goal tree has made some progress
-                // so one of the parents is not nullptr. We go one step 'back' to avoid having a duplicate state
-                // on the solution path
-                if (startMotion->parent != nullptr)
-                    startMotion = startMotion->parent;
-                else
-                    goalMotion = goalMotion->parent;
-                constructSolution(startMotion, goalMotion, false);
+
+                constructSolution(startMotion, goalMotion);
                 solved = true;
                 if (upperTimeBound_ - minimumTime_ <= epsilon_) break; // optimal solution is found
                 // continue to look for solutions with the narrower time bound until the termination condition is met
@@ -227,9 +266,69 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
 }
 
 SpaceTimeRRT::GrowState SpaceTimeRRT::growTree(SpaceTimeRRT::TreeData &tree, SpaceTimeRRT::TreeGrowingInfo &tgi,
-                                               SpaceTimeRRT::Motion *rmotion) {
-    /* find closest state in the tree */
-    Motion *nmotion = tree->nearest(rmotion);
+                                               SpaceTimeRRT::Motion *rmotion, std::vector<Motion *> &nbh, bool connect) {
+
+    // If connect, advance from single nearest neighbor until the random state is reached or trapped
+    if (connect) {
+        GrowState gsc = ADVANCED;
+        while (gsc == ADVANCED) {
+            // get nearest motion
+            Motion * nmotion = tree->nearest(rmotion);
+            gsc = growTreeSingle(tree, tgi, rmotion, nmotion);
+        }
+        return gsc;
+    }
+    if (rewireState_ == OFF) {
+        Motion * nmotion = tree->nearest(rmotion);
+        return growTreeSingle(tree, tgi, rmotion, nmotion);
+    }
+    // get Neighborhood of random state
+    getNeighbors(tree, rmotion, nbh);
+    // in start tree sort by distance
+    if (tgi.start) {
+        std::sort(nbh.begin(), nbh.end(), [this, &rmotion] (Motion *a, Motion *b)
+        {
+            return si_->distance(a->state, rmotion->state) < si_->distance(b->state, rmotion->state);
+        });
+    }
+    // in goal tree sort by time of root node
+    else {
+        std::sort(nbh.begin(), nbh.end(), [] (Motion *a, Motion *b)
+        {
+            auto t1 = a->root->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+            auto t2 = b->root->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+            return t1 < t2;
+        });
+    }
+
+    // attempt to grow the tree for all neighbors in sorted order
+    GrowState gs = TRAPPED;
+    auto rt = rmotion->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+    for (Motion *nmotion : nbh) {
+        auto nt = nmotion->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+        // trees grow only in one direction in time
+        if ((tgi.start && nt > rt) || (!tgi.start && nt < rt)) continue;
+        gs = growTreeSingle(tree, tgi, rmotion, nmotion);
+        if (gs != TRAPPED)
+            return gs;
+    }
+    // when radius is used for neighborhood calculation, the neighborhood might be empty
+    if (nbh.empty()) {
+        Motion * nmotion = tree->nearest(rmotion);
+        return growTreeSingle(tree, tgi, rmotion, nmotion);
+    }
+    // can't grow Tree
+    return gs;
+}
+
+SpaceTimeRRT::GrowState SpaceTimeRRT::growTreeSingle(SpaceTimeRRT::TreeData &tree, SpaceTimeRRT::TreeGrowingInfo &tgi,
+                                                     SpaceTimeRRT::Motion *rmotion, SpaceTimeRRT::Motion *nmotion) {
+
+    double rx = rmotion->state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
+    double rt = rmotion->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+
+    double nx = nmotion->state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
+    double nt = nmotion->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
 
     /* assume we can reach the state we go towards */
     bool reach = true;
@@ -238,7 +337,7 @@ SpaceTimeRRT::GrowState SpaceTimeRRT::growTree(SpaceTimeRRT::TreeData &tree, Spa
     ob::State *dstate = rmotion->state;
     double d = si_->distance(nmotion->state, rmotion->state);
 
-    if (d > maxDistance_)
+    if (d - epsilon_ > maxDistance_)
     {
         si_->getStateSpace()->interpolate(nmotion->state, rmotion->state, maxDistance_ / d, tgi.xstate);
         /* Check if we have moved at all. Due to some stranger state spaces (e.g., the constrained state spaces),
@@ -247,9 +346,23 @@ SpaceTimeRRT::GrowState SpaceTimeRRT::growTree(SpaceTimeRRT::TreeData &tree, Spa
         if (si_->equalStates(nmotion->state, tgi.xstate))
             return TRAPPED;
 
+        /* Check if the interpolated state can be reached from the random state with respect to the max speed constraint.
+         * When nmotion and rmotion are very close to the speed limit, interpolate can return an unreachable state. */
+        if (si_->distance(tgi.xstate, rmotion->state) > std::numeric_limits<double>::max()) {
+            if (tgi.xstate->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position <
+                    rmotion->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position) {
+                tgi.xstate->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position += epsilon_;
+            } else {
+                tgi.xstate->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position -= epsilon_;
+            }
+        }
+
         dstate = tgi.xstate;
         reach = false;
     }
+
+    double dx = dstate->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
+    double dt = dstate->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
 
     bool validMotion = tgi.start ? si_->checkMotion(nmotion->state, dstate) :
                        si_->isValid(dstate) && si_->checkMotion(dstate, nmotion->state);
@@ -268,10 +381,23 @@ SpaceTimeRRT::GrowState SpaceTimeRRT::growTree(SpaceTimeRRT::TreeData &tree, Spa
     return reach ? REACHED : ADVANCED;
 }
 
-void SpaceTimeRRT::constructSolution(SpaceTimeRRT::Motion *startMotion, SpaceTimeRRT::Motion *goalMotion, bool recursiveCall) {
+void SpaceTimeRRT::constructSolution(SpaceTimeRRT::Motion *startMotion, SpaceTimeRRT::Motion *goalMotion) {
+
+    if (goalMotion->connectionPoint == nullptr) {
+        goalMotion->connectionPoint = startMotion;
+        Motion *tMotion = goalMotion;
+        while (tMotion != nullptr) {
+            tMotion->numConnections++;
+            tMotion = tMotion->parent;
+        }
+    }
+    // check whether the found solution is an improvement
+    auto newTime = goalMotion->root->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+    if (newTime >= upperTimeBound_ - epsilon_)
+        return;
 
     numSolutions++;
-    connectionPoint_ = std::make_pair(startMotion->state, goalMotion->state);
+    isTimeBounded_ = true;
 
     /* construct the solution path */
     Motion *solution = startMotion;
@@ -300,7 +426,7 @@ void SpaceTimeRRT::constructSolution(SpaceTimeRRT::Motion *startMotion, SpaceTim
     }
 
 
-    // write to csv for visualization
+//     write to csv for visualization
     writeSamplesToCSV("prePruning");
 
     bestSolution_ = path;
@@ -308,33 +434,23 @@ void SpaceTimeRRT::constructSolution(SpaceTimeRRT::Motion *startMotion, SpaceTim
     auto bestTime = reachedGaol->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
 
     // Update Time Limit
-    upperTimeBound_ = (bestTime - minimumTime_ ) * solutionImproveFactor_ + minimumTime_;
+    upperTimeBound_ = (bestTime - minimumTime_ ) * optimumApproxFactor_ + minimumTime_;
     // Prune Start and Goal Trees
-    int numStartPruned, numGoalPruned;
-    bool solvedAgain = false;
-    numStartPruned = pruneStartTree();
-    std::tie(numGoalPruned, solvedAgain) = pruneGoalTree(goalMotion);
+    pruneStartTree();
+    Motion* newSolution = pruneGoalTree();
 
     std::cout << "\nFound Solution for t = " << bestTime << ". New time bound = " << upperTimeBound_;
-//    std::cout << "\n" << numStartPruned << " START STATES PRUNED";
-//    std::cout << "\n" << numGoalPruned << " GOAL STATES PRUNED";
-    int numGoal = 1;
-    for (auto &g : goalSet_) {
-        auto gx = g->state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
-        auto gt = g->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
-        std::cout << "\nGoal " << numGoal++ << " - x: " << gx << " t: " << gt;
-    }
 
     writeSolutionToCSV();
     writeSamplesToCSV("afterPruning");
 
     // loop as long as a new solution is found by rewiring the goal tree
-    if (solvedAgain) constructSolution(startMotion, goalMotion, true);
+    if (newSolution != nullptr)
+        constructSolution(newSolution->connectionPoint, goalMotion);
 }
 
-int SpaceTimeRRT::pruneStartTree() {
+void SpaceTimeRRT::pruneStartTree() {
 
-    int numPruned = 0;
     std::queue<Motion *> queue;
 
     tStart_->clear();
@@ -344,7 +460,7 @@ int SpaceTimeRRT::pruneStartTree() {
         double t = queue.front()->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
         double timeToNearestGoal = std::numeric_limits<double>::infinity();
         for (const auto &g : goalSet_) {
-            double deltaT = si_->getStateSpace()->template as<space_time::AnimationStateSpace>()
+            double deltaT = si_->getStateSpace()->as<space_time::AnimationStateSpace>()
                     ->timeToCoverDistance(queue.front()->state, g->state);
             if (deltaT < timeToNearestGoal) timeToNearestGoal = deltaT;
         }
@@ -378,19 +494,19 @@ int SpaceTimeRRT::pruneStartTree() {
                     si_->freeState(m->state);
                 // then delete the pointer
                 delete m;
-                numPruned++;
             }
         }
         // finally remove motion from the queue
         queue.pop();
     }
-
-    return numPruned;
 }
 
-std::tuple<int, bool> SpaceTimeRRT::pruneGoalTree(Motion * goalMotion) {
-    bool solvedAgain = false; // it's possible to get a new solution during the rewiring process
-    int numPruned = 0;
+SpaceTimeRRT::Motion* SpaceTimeRRT::pruneGoalTree() {
+
+    // it's possible to get multiple new solutions during the rewiring process. Store the best.
+    double bestSolutionTime = upperTimeBound_;
+    Motion * solutionMotion{nullptr};
+
     tGoal_->clear();
     std::vector<Motion *> validGoals;
     std::vector<Motion *> invalidGoals;
@@ -400,9 +516,7 @@ std::tuple<int, bool> SpaceTimeRRT::pruneGoalTree(Motion * goalMotion) {
         // add goal with all descendants to the tree
         if (t <= upperTimeBound_) {
             tGoal_->add(m);
-            bool addedGoalMotion = false;
-            addDescendants(m, tGoal_, goalMotion, &addedGoalMotion);
-            if (addedGoalMotion || m == goalMotion) solvedAgain = true;
+            addDescendants(m, tGoal_);
             validGoals.push_back(m);
         }
         // try to rewire descendants to a valid goal
@@ -417,20 +531,19 @@ std::tuple<int, bool> SpaceTimeRRT::pruneGoalTree(Motion * goalMotion) {
                     double costToGo = std::numeric_limits<double>::infinity();
                     double costSoFar = queue.front()->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
                     for (auto &g : validGoals) {
-                        auto deltaT = si_->getStateSpace()->template as<space_time::AnimationStateSpace>()
+                        auto deltaT = si_->getStateSpace()->as<space_time::AnimationStateSpace>()
                                 ->timeToCoverDistance(queue.front()->state, g->state);
                         if (deltaT < costToGo) costToGo = deltaT;
                     }
                     // try to rewire to the nearest neighbor
 
                     if (costSoFar + costToGo <= upperTimeBound_) {
-                        TreeGrowingInfo tgi;
+                        TreeGrowingInfo tgi{};
                         tgi.xstate = si_->allocState();
                         tgi.start = false;
-                        GrowState gsc = ADVANCED;
-                        while (gsc == ADVANCED) gsc = growTree(tGoal_, tgi, queue.front());
-                        // connection successful, add all descendants and check if the goal motion is added.
-                        // In that case, the problem is solved again for an improved time
+                        std::vector<Motion*> nbh;
+                        GrowState gsc = growTree(tGoal_, tgi, queue.front(), nbh, true);
+                        // connection successful, add all descendants and check if a new solution was found.
                         if (gsc == REACHED) {
                             // the motion was copied and added to the tree with a new parent
                             // adjust children and parent pointers
@@ -438,9 +551,32 @@ std::tuple<int, bool> SpaceTimeRRT::pruneGoalTree(Motion * goalMotion) {
                             for (auto &c : tgi.xmotion->children) {
                                 c->parent = tgi.xmotion;
                             }
-                            bool addedGoalMotion = false;
-                            addDescendants(tgi.xmotion, tGoal_, goalMotion, &addedGoalMotion);
-                            if (addedGoalMotion || queue.front() == goalMotion) solvedAgain = true;
+                            tgi.xmotion->connectionPoint = queue.front()->connectionPoint;
+                            tgi.xmotion->numConnections = queue.front()->numConnections;
+                            Motion* p = tgi.xmotion->parent;
+                            while (p != nullptr) {
+                                p->numConnections += tgi.xmotion->numConnections;
+                                p = p->parent;
+                            }
+                            addDescendants(tgi.xmotion, tGoal_);
+                            // new solution found
+                            if (tgi.xmotion->numConnections > 0 &&
+                                tgi.xmotion->root->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position < bestSolutionTime)
+                            {
+                                bestSolutionTime = tgi.xmotion->root->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+                                std::queue<Motion*> connectionQueue;
+                                connectionQueue.push(tgi.xmotion);
+                                while (!connectionQueue.empty()) {
+                                    if (connectionQueue.front()->connectionPoint != nullptr) {
+                                        solutionMotion = connectionQueue.front();
+                                        break;
+                                    } else {
+                                        for (Motion* c : connectionQueue.front()->children)
+                                            connectionQueue.push(c);
+                                    }
+                                    connectionQueue.pop();
+                                }
+                            }
                             addedToTree = true;
                         }
                     }
@@ -457,7 +593,6 @@ std::tuple<int, bool> SpaceTimeRRT::pruneGoalTree(Motion * goalMotion) {
                     si_->freeState(queue.front()->state);
                 // then delete the pointer
                 delete queue.front();
-                numPruned++;
 
                 queue.pop();
             }
@@ -470,10 +605,9 @@ std::tuple<int, bool> SpaceTimeRRT::pruneGoalTree(Motion * goalMotion) {
         if (g->state)
             si_->freeState(g->state);
         delete g;
-        numPruned++;
     }
 
-    return std::make_tuple(numPruned, solvedAgain);
+    return solutionMotion;
 }
 
 void SpaceTimeRRT::clear() {
@@ -483,7 +617,6 @@ void SpaceTimeRRT::clear() {
         tStart_->clear();
     if (tGoal_)
         tGoal_->clear();
-    connectionPoint_ = std::make_pair<ob::State *, ob::State *>(nullptr, nullptr);
     distanceBetweenTrees_ = std::numeric_limits<double>::infinity();
 }
 
@@ -518,10 +651,10 @@ void SpaceTimeRRT::getPlannerData(ob::PlannerData &data) const {
             // The edges in the goal tree are reversed to be consistent with start tree
             data.addEdge(ob::PlannerDataVertex(motion->state, 2), ob::PlannerDataVertex(motion->parent->state, 2));
         }
+        // add edges connecting the two trees
+        if (motion->connectionPoint != nullptr)
+            data.addEdge(data.vertexIndex(motion->connectionPoint->state), data.vertexIndex(motion->state));
     }
-
-    // Add the edge connecting the two trees
-    data.addEdge(data.vertexIndex(connectionPoint_.first), data.vertexIndex(connectionPoint_.second));
 
     // Add some info.
     data.properties["approx goal distance REAL"] = ompl::toString(distanceBetweenTrees_);
@@ -542,7 +675,14 @@ void SpaceTimeRRT::setup() {
 
     if (si_->getStateSpace()->as<space_time::AnimationStateSpace>()->getTimeComponent()->isBounded()) {
         upperTimeBound_ = si_->getStateSpace()->as<space_time::AnimationStateSpace>()->getTimeComponent()->getMaxTimeBound();
+        isTimeBounded_ = true;
+    } else {
+        upperTimeBound_ = std::numeric_limits<double>::infinity();
+        isTimeBounded_ = false;
     }
+
+    // Calculate some constants:
+    calculateRewiringLowerBounds();
 }
 
 void SpaceTimeRRT::removeFromParent(SpaceTimeRRT::Motion *m) {
@@ -556,26 +696,110 @@ void SpaceTimeRRT::removeFromParent(SpaceTimeRRT::Motion *m) {
     }
 }
 
-void SpaceTimeRRT::addDescendants(SpaceTimeRRT::Motion *m, const SpaceTimeRRT::TreeData &tree,
-                                  SpaceTimeRRT::Motion *goalMotion, bool *addedGoalMotion) {
+/**
+ * Adds all descendants of a motion to a given tree.
+ *
+ * @param m The motion, which descendants are added
+ * @param tree The tree that the motions are added to
+
+ */
+void SpaceTimeRRT::addDescendants(SpaceTimeRRT::Motion *m, const SpaceTimeRRT::TreeData &tree) {
+
     std::queue<Motion *> queue;
     for (auto &c : m->children)
         queue.push(c);
     while (!queue.empty()) {
         for (auto &c : queue.front()->children)
             queue.push(c);
+        queue.front()->root = m->root;
         tree->add(queue.front());
-        if (queue.front() == goalMotion) *addedGoalMotion = true;
         queue.pop();
     }
+}
+
+void SpaceTimeRRT::getNeighbors(SpaceTimeRRT::TreeData &tree, SpaceTimeRRT::Motion *motion, std::vector<Motion *> &nbh) const {
+
+    auto card = static_cast<double>(tree->size() + 1u);
+    if (rewireState_ == RADIUS) {
+        // r = min( r_rrt * (log(card(V))/card(V))^(1 / d), distance)
+        double r = std::min(maxDistance_, r_rrt_ * std::pow(log(card) / card, 1 / static_cast<double>(si_->getStateDimension())));
+    }
+    else if (rewireState_ == KNEAREST){
+        // k = k_rrt * log(card(V))
+        unsigned int k = std::ceil(k_rrt_ * log(card));
+        tree->nearestK(motion, k, nbh);
+    }
+}
+
+bool SpaceTimeRRT::rewireGoalTree(SpaceTimeRRT::Motion *addedMotion) {
+
+    bool solved = false;
+    std::vector<Motion*> nbh;
+    getNeighbors(tGoal_, addedMotion, nbh);
+    double nodeT = addedMotion->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+    double goalT = addedMotion->root->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+
+    for (Motion* otherMotion : nbh) {
+        double otherNodeT = otherMotion->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+        double otherGoalT = otherMotion->root->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+        // rewire, if goal time is improved and the otherMotion node can be connected to the added node
+        if (otherNodeT < nodeT && goalT < otherGoalT && si_->checkMotion(otherMotion->state, addedMotion->state)) {
+//            auto otherX = otherMotion->state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
+//            auto oldRootX = otherMotion->root->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
+//            auto newRootX = addedMotion->root->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
+//            std::cout << "\n Rewiring: \nNode [" << otherX << ", " << otherNodeT << "] \n with old root ["
+//                << oldRootX << ", " << otherGoalT << "] \n to new root ["
+//                << newRootX << ", " << goalT << "]\n";
+            // decrease connection count of old ancestors
+            if (otherMotion->numConnections > 0) {
+                Motion * p = otherMotion->parent;
+                while (p != nullptr) {
+                    p->numConnections--;
+                    p = p->parent;
+                }
+            }
+            removeFromParent(otherMotion);
+            otherMotion->parent = addedMotion;
+            otherMotion->root = addedMotion->root;
+            addedMotion->children.push_back(otherMotion);
+            // increase connection count of new ancestors
+            if (otherMotion->numConnections > 0) {
+                Motion * p = otherMotion->parent;
+                while (p != nullptr) {
+                    p->numConnections++;
+                    p = p->parent;
+                }
+                if (otherMotion->root->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position < upperTimeBound_) {
+                    solved = true;
+                }
+            }
+        }
+    }
+
+    return solved;
+}
+
+void SpaceTimeRRT::calculateRewiringLowerBounds() {
+
+    const auto dim = static_cast<double>(si_->getStateDimension());
+
+    // r_rrt > (2*(1+1/d))^(1/d)*(measure/ballvolume)^(1/d)
+    // prunedMeasure_ is set to si_->getSpaceMeasure();
+    r_rrt_ =
+            rewireFactor_ * std::pow(2 * (1.0 + 1.0 / dim) *
+            (si_->getSpaceMeasure() / ompl::unitNBallMeasure(si_->getStateDimension())), 1.0 / dim);
+
+    // k_rrg > e * (1 + 1 / d).  K-nearest RRT*
+    k_rrt_ = rewireFactor_ * boost::math::constants::e<double>() * (1.0 + 1.0 / dim);
 }
 
 bool SpaceTimeRRT::sampleGoalTime(ob::State * goal) {
     double lowerTimeBound = si_->getStateSpace()->as<space_time::AnimationStateSpace>()
             ->timeToCoverDistance(startMotion_->state, goal);
-    if (lowerTimeBound > upperTimeBound_) return false; // goal can't be reached in time
+    double utb = isTimeBounded_ ? upperTimeBound_ : lowerTimeBound * timeBoundFactor_;
+    if (lowerTimeBound > utb) return false; // goal can't be reached in time
 
-    double time = lowerTimeBound == upperTimeBound_ ? lowerTimeBound : rng_.uniformReal(lowerTimeBound, upperTimeBound_);
+    double time = lowerTimeBound == utb ? lowerTimeBound : rng_.uniformReal(lowerTimeBound, utb);
     goal->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position = time;
     return true;
 }
@@ -668,4 +892,8 @@ void SpaceTimeRRT::writeSolutionToCSV() {
 
     outfile.close();
 }
+
+
+
+
 }

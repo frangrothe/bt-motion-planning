@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
         }
         case 2: {
             time_2d::Time2DPlanner planner{filename};
-            planner.loadConfiguration1();
+            planner.loadConfiguration2();
             planner.planMotion();
             break;
         }

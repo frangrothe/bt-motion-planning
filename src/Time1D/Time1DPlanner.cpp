@@ -2,7 +2,7 @@
 // Created by francesco on 19.05.21.
 //
 
-#include <ompl/base/ProblemDefinition.h>
+
 #include "Time1DPlanner.h"
 
 namespace time_1d {
@@ -33,7 +33,7 @@ void Time1DPlanner::planMotion() {
     vectorSpace->setBounds(bounds);
 
     // Set the bounds for Time
-    space->setTimeBounds(timeBoundLow_, timeBoundHigh_);
+//    space->setTimeBounds(timeBoundLow_, timeBoundHigh_);
 
     ob::SpaceInformationPtr si = std::make_shared<ob::SpaceInformation>(space);
     si->setStateValidityChecker(std::make_shared<Time1DStateValidityChecker>(si, constraints_));
@@ -45,15 +45,15 @@ void Time1DPlanner::planMotion() {
     ob::ScopedState<> start(space);
     start[0] = xStart_; // r1State
 
-    minTime_ = (xGoalRegionLeft_ - xStart_) / vMax_; // minimum time at which the goal can be reached
     pdef->addStartState(start);
-//    pdef->setGoal(std::make_shared<Time1DGoalRegion>(si, xGoalRegionLeft_, xGoalRegionRight_, minTime_, timeBoundHigh_));
-    pdef->setGoal(std::make_shared<VectorSpaceGoalRegion>(si, xGoalRegionLeft_, xGoalRegionRight_));
+    pdef->setGoal(std::make_shared<VectorSpaceGoalRegion>(si, goalRegions_));
 
     //(3) Planner
 //    auto planner(std::make_shared<og::RRTConnect>(si));
     auto planner(std::make_shared<space_time::SpaceTimeRRT>(si));
     planner->setRange(plannerRange_);
+    planner->setRewiringToKNearest();
+    planner->setBatchSize(1000);
     planner->setProblemDefinition(pdef);
     planner->setup();
 
@@ -153,7 +153,11 @@ void Time1DPlanner::writeGoalRegionToCSV() {
     std::ofstream outfile ("data/" + filename_ + "/goal.csv");
 
     outfile << "x lb" << delim_ << "x ub" << delim_ << "t lb" << delim_ << "t ub\n";
-    outfile << xGoalRegionLeft_ << delim_ << xGoalRegionRight_ << delim_ << minTime_ << delim_ << timeBoundHigh_ << "\n";
+    for (auto &g : goalRegions_) {
+        double minTime = std::fabs((g.first - xStart_)) / vMax_; // minimum time at which the goal can be reached
+        outfile << g.first << delim_ << g.second << delim_ << minTime << delim_ << timeBoundHigh_ << "\n";
+    }
+
 
     outfile.close();
 }

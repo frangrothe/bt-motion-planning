@@ -55,9 +55,14 @@ def plot_motion_plan(filename):
         current_axis.add_patch(Rectangle((x_lb, t_lb), x_diff, t_diff, facecolor=ibm_blue))
 
     # draw goal region
-    x_diff = df_goal.iloc[0, x_ub_index] - df_goal.iloc[0, x_lb_index]
-    t_diff = df_goal.iloc[0, t_ub_index] - df_goal.iloc[0, t_lb_index]
-    current_axis.add_patch(Rectangle((df_goal.iloc[0, x_lb_index], df_goal.iloc[0, t_lb_index]), x_diff, t_diff, facecolor=ibm_yellow))
+    for i in range(len(df_goal.index)):
+        x_diff = df_goal.iloc[i, x_ub_index] - df_goal.iloc[i, x_lb_index]
+        t_diff = df_goal.iloc[i, t_ub_index] - df_goal.iloc[i, t_lb_index]
+        if x_diff == 0:
+            x_diff = 0.0001
+        current_axis.add_patch(
+            Rectangle((df_goal.iloc[i, x_lb_index], df_goal.iloc[i, t_lb_index]), x_diff, t_diff, facecolor=ibm_yellow))
+
 
     # create handles for the legend
     sample_line = Line2D([], [], color='black', marker='.',

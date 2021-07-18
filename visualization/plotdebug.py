@@ -35,6 +35,7 @@ def plot_motion_plan(fileindex):
     df_path = read_csv('data/debug/' + fileindex + 'path.csv')
     timebound = df_path.iloc[0, 2]
 
+
     fig, axs = plt.subplots(1, 2, constrained_layout=True)
 
     # draw graph before Pruning
@@ -59,10 +60,14 @@ def plot_single_graph(ax, samples, constraints, goal, timebound, path=None):
         ax.add_patch(Rectangle((x_lb, t_lb), x_diff, t_diff, facecolor=ibm_orange))
 
     # draw goal region
-    x_diff = goal.iloc[0, x_ub_index] - goal.iloc[0, x_lb_index]
-    t_diff = goal.iloc[0, t_ub_index] - goal.iloc[0, t_lb_index]
-    ax.add_patch(
-        Rectangle((goal.iloc[0, x_lb_index], goal.iloc[0, t_lb_index]), x_diff, t_diff, facecolor=ibm_yellow, zorder=1))
+    for i in range(len(goal.index)):
+        x_diff = goal.iloc[i, x_ub_index] - goal.iloc[i, x_lb_index]
+        t_diff = goal.iloc[i, t_ub_index] - goal.iloc[i, t_lb_index]
+        if x_diff == 0:
+            ax.plot([goal.iloc[i, x_ub_index], goal.iloc[i, x_ub_index]], [goal.iloc[i, t_ub_index], goal.iloc[i, t_lb_index]], color=ibm_yellow)
+        else:
+            ax.add_patch(
+                Rectangle((goal.iloc[i, x_lb_index], goal.iloc[i, t_lb_index]), x_diff, t_diff, facecolor=ibm_yellow))
 
     # draw start and goal tree
     for i in range(len(samples.index)):
