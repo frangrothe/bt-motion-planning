@@ -3,6 +3,8 @@
 #include "Time1D/Time1DPlanner.h"
 #include "Time2D/Time2DPlanner.h"
 #include "Dubins/DubinsPlanner.h"
+#include "MotionQuery2D/QueryExecutor.h"
+#include "TimeND/TimeNDPlanner.h"
 #include "auxillary.h"
 
 int main(int argc, char* argv[]) {
@@ -36,6 +38,15 @@ int main(int argc, char* argv[]) {
         }
         case 3: {
             dubins::DubinsPlanner planner{filename};
+            planner.planMotion();
+            break;
+        }
+        case 4: {
+            query2d::QueryExecutor::execute();
+            break;
+        }
+        case 5: {
+            nd::TimeNDPlanner planner{};
             planner.planMotion();
             break;
         }

@@ -45,20 +45,20 @@ private:
 
     double xStart_ = 0.0;
     std::vector<std::pair<double, double>> goalRegions_ = {
-            {1.0, 1.2}
+            {1.0, 1.05}
 //            {-1.2, -1.2}
     };
 
     std::vector<Constraint> constraints_ {
-            {0.05, 0.15, 0.16, 0.35},
-            {0.5, 0.6, 0.51, 0.6},
-            {0.5, 0.6, 0.71, 0.8},
-            {0.5, 0.6, 1.01, 1.1},
-            {0.9, 1.1, 0.0, 10.0}
+//            {0.05, 0.15, 0.16, 0.35},
+//            {0.5, 0.6, 0.51, 0.6},
+//            {0.5, 0.6, 0.71, 0.8},
+//            {0.5, 0.6, 1.01, 1.1},
+            {0.9, 1.1, 0.0, 30.0}
     };
     double vMax_ = 1.0; // 1 m/s
     double timeWeight_ = 0.5; // compared to distance weight used in distance function. [0,1]
-    double solveTime_ = 2.0; // in seconds
+    double solveTime_ = 30.0; // in seconds
     double plannerRange_ = 0.2;
 
     std::string filename_;

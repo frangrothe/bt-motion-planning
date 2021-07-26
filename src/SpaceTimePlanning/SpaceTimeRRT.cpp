@@ -7,8 +7,10 @@
 namespace space_time {
 
 
-SpaceTimeRRT::SpaceTimeRRT(const ompl::base::SpaceInformationPtr &si) : Planner(si, "SpaceTimeRRT"), goalSet_(&goalSetCmp),
-                                                                        sampler_(&(*si), startMotion_, goalSet_) {
+SpaceTimeRRT::SpaceTimeRRT(const ompl::base::SpaceInformationPtr &si)
+        : Planner(si, "SpaceTimeRRT"),
+          sampler_(&(*si), startMotion_, goalMotions_, newBatchGoalMotions_, sampleOldBatch_)
+{
 
     Planner::declareParam<double>("range", this, &SpaceTimeRRT::setRange, &SpaceTimeRRT::getRange, "0.:1.:10000.");
     distanceBetweenTrees_ = std::numeric_limits<double>::infinity();
@@ -16,6 +18,31 @@ SpaceTimeRRT::SpaceTimeRRT(const ompl::base::SpaceInformationPtr &si) : Planner(
 
 SpaceTimeRRT::~SpaceTimeRRT() {
     freeMemory();
+}
+
+void SpaceTimeRRT::setup() {
+
+    Planner::setup();
+    ompl::tools::SelfConfig sc(si_, getName());
+    sc.configurePlannerRange(maxDistance_);
+
+    if (!tStart_)
+        tStart_.reset(new ompl::NearestNeighborsLinear<Motion *>());
+    if (!tGoal_)
+        tGoal_.reset(new ompl::NearestNeighborsLinear<Motion *>());
+    tStart_->setDistanceFunction([this](const Motion *a, const Motion *b) { return distanceFunction(a, b); });
+    tGoal_->setDistanceFunction([this](const Motion *a, const Motion *b) { return distanceFunction(a, b); });
+
+    if (si_->getStateSpace()->as<space_time::AnimationStateSpace>()->getTimeComponent()->isBounded()) {
+        upperTimeBound_ = si_->getStateSpace()->as<space_time::AnimationStateSpace>()->getTimeComponent()->getMaxTimeBound();
+        isTimeBounded_ = true;
+    } else {
+        upperTimeBound_ = std::numeric_limits<double>::infinity();
+        isTimeBounded_ = false;
+    }
+
+    // Calculate some constants:
+    calculateRewiringLowerBounds();
 }
 
 void SpaceTimeRRT::freeMemory() {
@@ -64,10 +91,6 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
         motion->root = motion->state;
         tStart_->add(motion);
         startMotion_ = motion;
-
-
-        auto s = si_->allocState();
-        si_->copyState(s, st);
     }
 
     if (tStart_->size() == 0)
@@ -96,7 +119,14 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
     ob::State *rstate = rmotion->state;
     bool startTree = true;
     bool solved = false;
-    int numBatchSamples = 0;
+    unsigned int batchSize = initialBatchSize_; // samples to fill the current batch
+    int numBatchSamples = static_cast<int>(tStart_->size() + tGoal_->size()); // number of samples in the current batch (old + new batch region)
+    int newBatchGoalSamples = 0; // number of goal samples in the new batch region
+    bool firstBatch = true;
+    double oldBatchSampleProb = 1.0; // probability to sample the old batch region
+
+    OMPL_INFORM("%s: Starting planning with time bound factor %.2f", getName().c_str(),
+                newBatchTimeBoundFactor_);
 
     while (!ptc)
     {
@@ -105,47 +135,96 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
         startTree = !startTree;
         TreeData &otherTree = startTree ? tStart_ : tGoal_;
 
-        // as long as time is unbounded, double the time bound factor whenever the batch is full.
-        if (!isTimeBounded_ && numBatchSamples >= batchSize_) {
-            timeBoundFactor_*= 2;
+        // batch is full
+        if (!isTimeBounded_ && numBatchSamples >= batchSize) {
+            if (firstBatch) {
+                firstBatch = false;
+                oldBatchSampleProb = 0.5 * (1 / timeBoundFactorIncrease_);
+            }
+            oldBatchTimeBoundFactor_ = newBatchTimeBoundFactor_;
+            newBatchTimeBoundFactor_ *= timeBoundFactorIncrease_;
+            startTree = true;
+            batchSize = std::ceil(2.0 * (timeBoundFactorIncrease_ - 1.0) * static_cast<double>(tStart_->size() + tGoal_->size()));
             numBatchSamples = 0;
-            std::cout << "\n\nNew Time Bound Factor: " << timeBoundFactor_;
+            if (!newBatchGoalMotions_.empty()) {
+                goalMotions_.insert(goalMotions_.end(), newBatchGoalMotions_.begin(), newBatchGoalMotions_.end());
+                newBatchGoalMotions_.clear();
+            }
+            OMPL_INFORM("%s: Increased time bound factor to %.2f", getName().c_str(),
+                        newBatchTimeBoundFactor_);
         }
 
-        if (tGoal_->size() == 0 || goalSet_.size() < tGoal_->size() / 4)
-        {
-            const ob::State *st = tGoal_->size() == 0 ? nextGoal(ptc) : nextGoal();
-            if (st != nullptr)
-            {
-                auto *motion = new Motion(si_);
-                si_->copyState(motion->state, st);
-                motion->root = motion->state;
-                tGoal_->add(motion);
-                goalSet_.insert(motion);
+        // determine whether the old or new batch is sampled
+        sampleOldBatch_ = (firstBatch || isTimeBounded_ || rng_.uniform01() <= oldBatchSampleProb);
 
-                auto s = si_->allocState();
-                si_->copyState(s, st);
+        ob::State *goalState{nullptr};
+        if (sampleOldBatch_) {
+            // sample until successful or time is up
+            if (goalMotions_.empty() && isTimeBounded_)
+                goalState = nextGoal(ptc);
+            // sample for n tries, with n = batch size
+            else if (goalMotions_.empty() && !isTimeBounded_) {
+                goalState = nextGoal(static_cast<int>(batchSize));
+                // the goal region is most likely blocked for this time period -> increase upper time bound
+                if (goalState == nullptr) {
+                    newBatchTimeBoundFactor_ *= timeBoundFactorIncrease_;
+                    oldBatchTimeBoundFactor_ = newBatchTimeBoundFactor_;
+                    startTree = true;
+                    batchSize = std::ceil(2.0 * (timeBoundFactorIncrease_ - 1.0) * static_cast<double>(tStart_->size() + tGoal_->size()));
+                    numBatchSamples = 0;
+                    OMPL_INFORM("%s: Increased time bound factor to %.2f", getName().c_str(),
+                                newBatchTimeBoundFactor_);
+                    continue;
+                }
+            }
+            // sample for a single try
+            else if (goalMotions_.size() < (tGoal_->size() - newBatchGoalSamples) / goalStateSampleRatio_)
+                goalState = nextGoal(1);
+        }
+        else {
+            if (newBatchGoalMotions_.empty()) {
+                goalState = nextGoal(static_cast<int>(batchSize));
+                // the goal region is most likely blocked for this time period -> increase upper time bound
+                if (goalState == nullptr) {
+                    oldBatchTimeBoundFactor_ = newBatchTimeBoundFactor_;
+                    newBatchTimeBoundFactor_ *= timeBoundFactorIncrease_;
+                    startTree = true;
+                    batchSize = std::ceil(2.0 * (timeBoundFactorIncrease_ - 1.0) * static_cast<double>(tStart_->size() + tGoal_->size()));
+                    numBatchSamples = 0;
+                    OMPL_INFORM("%s: Increased time bound factor to %.2f", getName().c_str(),
+                                newBatchTimeBoundFactor_);
+                    continue;
+                }
+            }
+            else if (newBatchGoalMotions_.size() < newBatchGoalSamples / goalStateSampleRatio_)
+                goalState = nextGoal(1);
+        }
 
-                minimumTime_ = std::min(minimumTime_, si_->getStateSpace()
-                ->as<space_time::AnimationStateSpace>()->timeToCoverDistance(startMotion_->state, st));
-                numBatchSamples++;
+        if (goalState != nullptr) {
+            auto *motion = new Motion(si_);
+            si_->copyState(motion->state, goalState);
+            motion->root = motion->state;
+            tGoal_->add(motion);
+            if (sampleOldBatch_)
+                goalMotions_.push_back(motion);
+            else {
+                newBatchGoalMotions_.push_back(motion);
+                newBatchGoalSamples++;
             }
 
-            if (tGoal_->size() == 0)
-            {
-                OMPL_ERROR("%s: Unable to sample any valid states for goal tree", getName().c_str());
-                break;
-            }
+            minimumTime_ = std::min(minimumTime_, si_->getStateSpace()
+                    ->as<space_time::AnimationStateSpace>()->timeToCoverDistance(startMotion_->state, goalState));
+            numBatchSamples++;
         }
 
         /* sample random state */
         sampler_.sample(rstate);
-        numBatchSamples++;
 
         // EXTEND
         GrowState gs = growTree(tree, tgi, rmotion, nbh, false);
         if (gs != TRAPPED)
         {
+            numBatchSamples++;
             /* remember which motion was just added */
             Motion *addedMotion = tgi.xmotion;
             Motion *startMotion;
@@ -183,6 +262,7 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
             /* attempt to connect trees, if rewiring didn't find a new solution */
             // CONNECT
             if (!newSolution) {
+                int totalSamples = static_cast<int>(tStart_->size() + tGoal_->size());
                 GrowState gsc = growTree(otherTree, tgi, rmotion, nbh, true);
                 if (gsc == REACHED) {
                     newSolution = true;
@@ -196,6 +276,7 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
                     else
                         goalMotion = goalMotion->parent;
                 }
+                numBatchSamples += static_cast<int>(tStart_->size() + tGoal_->size()) - totalSamples;
             }
 
 
@@ -213,7 +294,7 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
 
                 constructSolution(startMotion, goalMotion);
                 solved = true;
-                if (upperTimeBound_ - minimumTime_ <= epsilon_) break; // optimal solution is found
+                if (!optimize_ || upperTimeBound_ - minimumTime_ <= epsilon_) break; // first solution is enough or optimal solution is found
                 // continue to look for solutions with the narrower time bound until the termination condition is met
             }
             else
@@ -312,7 +393,7 @@ SpaceTimeRRT::GrowState SpaceTimeRRT::growTree(SpaceTimeRRT::TreeData &tree, Spa
         if (gs != TRAPPED)
             return gs;
     }
-    // when radius is used for neighborhood calculation, the neighborhood might be empty
+    // when radius_ is used for neighborhood calculation, the neighborhood might be empty
     if (nbh.empty()) {
         Motion * nmotion = tree->nearest(rmotion);
         return growTreeSingle(tree, tgi, rmotion, nmotion);
@@ -347,13 +428,14 @@ SpaceTimeRRT::GrowState SpaceTimeRRT::growTreeSingle(SpaceTimeRRT::TreeData &tre
             return TRAPPED;
 
         /* Check if the interpolated state can be reached from the random state with respect to the max speed constraint.
-         * When nmotion and rmotion are very close to the speed limit, interpolate can return an unreachable state. */
+         * When nmotion and rmotion are very close to the speed limit, interpolate can return an unreachable state.
+         * In that case, increase the time difference by epsilon. */
         if (si_->distance(tgi.xstate, rmotion->state) > std::numeric_limits<double>::max()) {
             if (tgi.xstate->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position <
                     rmotion->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position) {
-                tgi.xstate->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position += epsilon_;
-            } else {
                 tgi.xstate->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position -= epsilon_;
+            } else {
+                tgi.xstate->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position += epsilon_;
             }
         }
 
@@ -398,6 +480,10 @@ void SpaceTimeRRT::constructSolution(SpaceTimeRRT::Motion *startMotion, SpaceTim
 
     numSolutions++;
     isTimeBounded_ = true;
+    if (!newBatchGoalMotions_.empty()) {
+        goalMotions_.insert(goalMotions_.end(), newBatchGoalMotions_.begin(), newBatchGoalMotions_.end());
+        newBatchGoalMotions_.clear();
+    }
 
     /* construct the solution path */
     Motion *solution = startMotion;
@@ -459,7 +545,7 @@ void SpaceTimeRRT::pruneStartTree() {
     while (!queue.empty()) {
         double t = queue.front()->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
         double timeToNearestGoal = std::numeric_limits<double>::infinity();
-        for (const auto &g : goalSet_) {
+        for (const auto &g : goalMotions_) {
             double deltaT = si_->getStateSpace()->as<space_time::AnimationStateSpace>()
                     ->timeToCoverDistance(queue.front()->state, g->state);
             if (deltaT < timeToNearestGoal) timeToNearestGoal = deltaT;
@@ -511,7 +597,12 @@ SpaceTimeRRT::Motion* SpaceTimeRRT::pruneGoalTree() {
     std::vector<Motion *> validGoals;
     std::vector<Motion *> invalidGoals;
 
-    for (auto &m : goalSet_) {
+    // re-add goals with smallest time first
+    std::sort(goalMotions_.begin(), goalMotions_.end(), [] (Motion * a, Motion * b) {
+        return a->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position <
+               b->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+    });
+    for (auto &m : goalMotions_) {
         double t = m->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
         // add goal with all descendants to the tree
         if (t <= upperTimeBound_) {
@@ -601,7 +692,12 @@ SpaceTimeRRT::Motion* SpaceTimeRRT::pruneGoalTree() {
 
     // remove invalid goals
     for (auto &g : invalidGoals) {
-        goalSet_.erase(g);
+        for (auto it = goalMotions_.begin(); it != goalMotions_.end(); ++it) {
+            if (*it == g) {
+                goalMotions_.erase(it);
+                break;
+            }
+        }
         if (g->state)
             si_->freeState(g->state);
         delete g;
@@ -660,31 +756,6 @@ void SpaceTimeRRT::getPlannerData(ob::PlannerData &data) const {
     data.properties["approx goal distance REAL"] = ompl::toString(distanceBetweenTrees_);
 }
 
-void SpaceTimeRRT::setup() {
-
-    Planner::setup();
-    ompl::tools::SelfConfig sc(si_, getName());
-    sc.configurePlannerRange(maxDistance_);
-
-    if (!tStart_)
-        tStart_.reset(new ompl::NearestNeighborsLinear<Motion *>());
-    if (!tGoal_)
-        tGoal_.reset(new ompl::NearestNeighborsLinear<Motion *>());
-    tStart_->setDistanceFunction([this](const Motion *a, const Motion *b) { return distanceFunction(a, b); });
-    tGoal_->setDistanceFunction([this](const Motion *a, const Motion *b) { return distanceFunction(a, b); });
-
-    if (si_->getStateSpace()->as<space_time::AnimationStateSpace>()->getTimeComponent()->isBounded()) {
-        upperTimeBound_ = si_->getStateSpace()->as<space_time::AnimationStateSpace>()->getTimeComponent()->getMaxTimeBound();
-        isTimeBounded_ = true;
-    } else {
-        upperTimeBound_ = std::numeric_limits<double>::infinity();
-        isTimeBounded_ = false;
-    }
-
-    // Calculate some constants:
-    calculateRewiringLowerBounds();
-}
-
 void SpaceTimeRRT::removeFromParent(SpaceTimeRRT::Motion *m) {
     for (auto it = m->parent->children.begin(); it != m->parent->children.end(); ++it)
     {
@@ -721,8 +792,9 @@ void SpaceTimeRRT::getNeighbors(SpaceTimeRRT::TreeData &tree, SpaceTimeRRT::Moti
 
     auto card = static_cast<double>(tree->size() + 1u);
     if (rewireState_ == RADIUS) {
-        // r = min( r_rrt * (log(card(V))/card(V))^(1 / d), distance)
-        double r = std::min(maxDistance_, r_rrt_ * std::pow(log(card) / card, 1 / static_cast<double>(si_->getStateDimension())));
+        // r = min( r_rrt * (log(card(V))/card(V))^(1 / d + 1), distance)
+        // for the formula change of the RRTStar paper, see 'Revisiting the asymptotic optimality of RRT*'
+        double r = std::min(maxDistance_, r_rrt_ * std::pow(log(card) / card, 1.0 / 1.0 + static_cast<double>(si_->getStateDimension())));
     }
     else if (rewireState_ == KNEAREST){
         // k = k_rrt * log(card(V))
@@ -794,22 +866,39 @@ void SpaceTimeRRT::calculateRewiringLowerBounds() {
 }
 
 bool SpaceTimeRRT::sampleGoalTime(ob::State * goal) {
-    double lowerTimeBound = si_->getStateSpace()->as<space_time::AnimationStateSpace>()
+    double ltb, utb;
+    double minTime = si_->getStateSpace()->as<space_time::AnimationStateSpace>()
             ->timeToCoverDistance(startMotion_->state, goal);
-    double utb = isTimeBounded_ ? upperTimeBound_ : lowerTimeBound * timeBoundFactor_;
-    if (lowerTimeBound > utb) return false; // goal can't be reached in time
+    if (isTimeBounded_) {
+        ltb = minTime;
+        utb = upperTimeBound_;
+    }
+    else if (sampleOldBatch_) {
+        ltb = minTime;
+        utb = minTime * oldBatchTimeBoundFactor_;
+    }
+    else {
+        ltb = minTime * oldBatchTimeBoundFactor_;
+        utb = minTime * newBatchTimeBoundFactor_;
+    }
 
-    double time = lowerTimeBound == utb ? lowerTimeBound : rng_.uniformReal(lowerTimeBound, utb);
+    if (ltb > utb) return false; // goal can't be reached in time
+
+    double time = ltb == utb ? ltb : rng_.uniformReal(ltb, utb);
     goal->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position = time;
     return true;
 }
 
-ob::State *SpaceTimeRRT::nextGoal() {
-    static ob::PlannerTerminationCondition ptc = ob::plannerAlwaysTerminatingCondition();
-    return nextGoal(ptc);
+ob::State *SpaceTimeRRT::nextGoal(int n) {
+    static ob::PlannerTerminationCondition ptc = ob::plannerNonTerminatingCondition();
+    return nextGoal(ptc, n);
 }
 
 ob::State *SpaceTimeRRT::nextGoal(const ob::PlannerTerminationCondition &ptc) {
+    return nextGoal(ptc, -1);
+}
+
+ob::State *SpaceTimeRRT::nextGoal(const ob::PlannerTerminationCondition &ptc, int n) {
     if (pdef_->getGoal() != nullptr)
     {
         const ob::GoalSampleableRegion *goal =
@@ -819,6 +908,7 @@ ob::State *SpaceTimeRRT::nextGoal(const ob::PlannerTerminationCondition &ptc) {
         {
             if (tempState_ == nullptr)
                 tempState_ = si_->allocState();
+            int tryCount = 0;
             do
             {
                 goal->sampleGoal(tempState_); // sample space component
@@ -829,7 +919,7 @@ ob::State *SpaceTimeRRT::nextGoal(const ob::PlannerTerminationCondition &ptc) {
                 {
                     return tempState_;
                 }
-            } while (!ptc);
+            } while (!ptc.eval() && ++tryCount != n);
         }
     }
 
@@ -892,8 +982,4 @@ void SpaceTimeRRT::writeSolutionToCSV() {
 
     outfile.close();
 }
-
-
-
-
 }

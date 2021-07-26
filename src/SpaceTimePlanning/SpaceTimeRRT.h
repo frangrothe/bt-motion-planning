@@ -53,6 +53,18 @@ public:
         return maxDistance_;
     }
 
+    /** \brief Set whether the planner should optimize the solution with respect to time. */
+    void setOptimize(bool optimize)
+    {
+        optimize_ = optimize;
+    }
+
+    /** \brief Get whether the planner optimizes the solution. */
+    bool getOptimize() const
+    {
+        return optimize_;
+    }
+
     double getOptimumApproxFactor() const
     {
         return optimumApproxFactor_;
@@ -102,7 +114,7 @@ public:
 
     unsigned int getBatchSize() const
     {
-        return batchSize_;
+        return initialBatchSize_;
     }
 
     void setBatchSize(int v)
@@ -110,7 +122,7 @@ public:
         if (v < 1) {
             OMPL_ERROR("%s: Batch Size needs to be at least 1.", getName().c_str());
         }
-        batchSize_ = v;
+        initialBatchSize_ = v;
     }
 
     void setup() override;
@@ -138,34 +150,62 @@ protected:
 
     class ConditionalSampler : public ob::ValidStateSampler
     {
-        static bool goalSetCmp(Motion * a, Motion * b) {
-            return a->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position <
-                   b->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
-        }
+
     public:
         ConditionalSampler(const ompl::base::SpaceInformation *si, Motion * &startMotion,
-                                    std::set<Motion *, decltype(&goalSetCmp)> &goalSet) : ValidStateSampler(si),
-                                    startMotion_(startMotion), goalSet_(goalSet)
+                           std::vector<Motion *> &goalMotions, std::vector<Motion *> &newlyAddedGoalMotions,
+                           bool &sampleOldBatch)
+                : ValidStateSampler(si),
+                  startMotion_(startMotion), goalMotions_(goalMotions), newBatchGoalMotions_(newlyAddedGoalMotions),
+                  sampleOldBatch_(sampleOldBatch)
         {
             name_ = "ConditionalSampler";
         }
 
         bool sample(ob::State *state) override {
             bool validSample = false;
+
             while (!validSample) {
                 internalSampler_->sampleUniform(state);
+                double leftBound, rightBound;
                 // get minimum time, when the state can be reached from the start
-                double leftBound = startMotion_->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position +
+                double startBound = startMotion_->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position +
                                    si_->getStateSpace()->as<space_time::AnimationStateSpace>()->timeToCoverDistance(state, startMotion_->state);
-
-                // get maximum time, at which any goal can be reached from the state
-                double rightBound = std::numeric_limits<double>::min();
-                for (auto goal : goalSet_) {
-                    double t = goal->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position -
-                               si_->getStateSpace()->as<space_time::AnimationStateSpace>()->timeToCoverDistance(goal->state, state);
-                    if (t > rightBound) {
-                        rightBound = t;
+                // sample old batch
+                if (sampleOldBatch_) {
+                    leftBound = startBound;
+                    // get maximum time, at which any goal can be reached from the state
+                    rightBound = std::numeric_limits<double>::min();
+                    for (auto goal : goalMotions_) {
+                        double t = goal->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position -
+                                   si_->getStateSpace()->as<space_time::AnimationStateSpace>()->timeToCoverDistance(goal->state, state);
+                        if (t > rightBound) {
+                            rightBound = t;
+                        }
                     }
+                }
+                // sample new batch
+                else {
+                    // get maximum time, at which any goal from the new batch can be reached from the state
+                    rightBound = std::numeric_limits<double>::min();
+                    for (auto goal : newBatchGoalMotions_) {
+                        double t = goal->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position -
+                                   si_->getStateSpace()->as<space_time::AnimationStateSpace>()->timeToCoverDistance(goal->state, state);
+                        if (t > rightBound) {
+                            rightBound = t;
+                        }
+                    }
+                    // get maximum time, at which any goal from the old batch can be reached from the state
+                    // only allow the left bound to be smaller than the right bound
+                    leftBound = std::numeric_limits<double>::min();
+                    for (auto goal : goalMotions_) {
+                        double t = goal->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position -
+                                   si_->getStateSpace()->as<space_time::AnimationStateSpace>()->timeToCoverDistance(goal->state, state);
+                        if (t > leftBound && t < rightBound) {
+                            leftBound = t;
+                        }
+                    }
+                    leftBound = std::max(leftBound, startBound);
                 }
 
                 if (leftBound <= rightBound) {
@@ -181,17 +221,26 @@ protected:
             throw ompl::Exception("ConditionalSampler::sampleNear", "not implemented");
         }
 
+
+
     private:
         ob::StateSamplerPtr internalSampler_ = si_->allocStateSampler();
 
         /** References to the start state and goal states */
         Motion * &startMotion_;
 
-        std::set<Motion *, decltype(&goalSetCmp)> &goalSet_;
+        std::vector<Motion *> &goalMotions_;
+        std::vector<Motion *> &newBatchGoalMotions_;
+
+        /** References to whether the old or new batch region is sampled */
+        bool &sampleOldBatch_;
 
         /** \brief The random number generator */
         ompl::RNG rng_;
     };
+
+    /** \brief Whether the solution is optimized for time or the first solution terminates the algorithm. */
+    bool optimize_ = true;
 
     /** \brief A nearest-neighbor datastructure representing a tree of motions */
     using TreeData = std::shared_ptr<ompl::NearestNeighbors<Motion *>>;
@@ -224,7 +273,7 @@ protected:
      * until the random state is reached or an obstacle is met. If connect is false, the tree is only extended by a single new state. */
     GrowState growTree(TreeData &tree, TreeGrowingInfo &tgi, Motion *rmotion, std::vector<Motion *> &nbh, bool connect);
 
-    /** \brief Gets the neighbours of a given motion, using either k-nearest or radius as appropriate. */
+    /** \brief Gets the neighbours of a given motion, using either k-nearest or radius_ as appropriate. */
     void getNeighbors(TreeData &tree, Motion *motion, std::vector<Motion *> &nbh) const;
 
     /** \brief Free the memory allocated by this planner */
@@ -277,15 +326,14 @@ protected:
     /** \brief The difference, at which two doubles are considered equal. */
     double epsilon_ = 1.0e-9;
 
-    /** \brief The start Motion, used for start tree pruning. */
-    Motion * startMotion_;
+    /** \brief The start Motion, used for conditional sampling and start tree pruning. */
+    Motion * startMotion_{nullptr};
 
-    static bool goalSetCmp(Motion * a, Motion * b) {
-        return a->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position <
-                b->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
-    }
-    /** \brief The goal Motions, ordered by time ascending. */
-    std::set<Motion *, decltype(&goalSetCmp)> goalSet_;
+    /** \brief The goal Motions, used for conditional sampling and pruning. */
+    std::vector<Motion *> goalMotions_{};
+
+    /** \brief The goal Motions, that were added in the current expansion step, used for uniform sampling over a growing region. */
+    std::vector<Motion *> newBatchGoalMotions_{};
 
     /**
      * Gaol Sampling is not handled by PlannerInputStates, but directly by the SpaceTimeRRT,
@@ -293,13 +341,16 @@ protected:
      *
      */
 
-    ob::State *tempState_; // temporary sampled goal states are stored here.
+    ob::State *tempState_{nullptr}; // temporary sampled goal states are stored here.
 
-    /** \brief A single try to sample a goal. */
-    ob::State * nextGoal();
+    /** \brief N tries to sample a goal. */
+    ob::State * nextGoal(int n);
 
     /** \brief Samples a goal until successful or the termination condition is fulfilled. */
     ob::State * nextGoal(const ob::PlannerTerminationCondition &ptc);
+
+    /** \brief Samples a goal until successful or the termination condition is fulfilled. */
+    ob::State * nextGoal(const ob::PlannerTerminationCondition &ptc, int n);
 
     /** \brief Samples the time component of a goal state dependant on its space component. Returns false, if goal can't be reached in time. */
     bool sampleGoalTime(ob::State * goal);
@@ -341,11 +392,25 @@ protected:
     /** \brief Whether the time is bounded or not. The first solution automatically bounds the time. */
     bool isTimeBounded_;
 
-    /** \brief Number of samples before the upper time bound gets increased */
-    unsigned int batchSize_ = 1000;
+    /** \brief Number of samples of the first batch */
+    unsigned int initialBatchSize_ = 200;
 
-    /** \brief While time is unbounded, goals are sampled from their respective minimum time to minimum time \times time bound factor. */
-    double timeBoundFactor_ = 2;
+    /** \brief Initial factor, the minimum time of each goal is multiplied with to calculate the upper time bound. */
+    double initialTimeBoundFactor_ = 2.0;
+
+    /** \brief The factor, the time bound is increased with after the batch is full. */
+    double timeBoundFactorIncrease_ = 2.0;
+
+    /** \brief Time Bound factor for the old batch. */
+    double oldBatchTimeBoundFactor_ = initialTimeBoundFactor_;
+
+    /** \brief Time Bound factor for the new batch. */
+    double newBatchTimeBoundFactor_ = initialTimeBoundFactor_;
+
+    bool sampleOldBatch_ = true;
+
+    /** \brief The ratio, a goal state is sampled compared to the size of the goal tree. */
+    int goalStateSampleRatio_ = 4;
 
     void writeSamplesToCSV(const std::string& type);
     void writeSolutionToCSV();

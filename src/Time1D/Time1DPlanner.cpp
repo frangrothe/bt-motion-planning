@@ -53,7 +53,8 @@ void Time1DPlanner::planMotion() {
     auto planner(std::make_shared<space_time::SpaceTimeRRT>(si));
     planner->setRange(plannerRange_);
     planner->setRewiringToKNearest();
-    planner->setBatchSize(1000);
+    planner->setBatchSize(100);
+//    planner->setOptimize(false);
     planner->setProblemDefinition(pdef);
     planner->setup();
 
