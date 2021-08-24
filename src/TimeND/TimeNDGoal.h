@@ -8,6 +8,7 @@
 #include <ompl/base/goals/GoalSampleableRegion.h>
 #include <ompl/base/ScopedState.h>
 #include <ompl/base/spaces/RealVectorStateSpace.h>
+#include <ompl/base/spaces/TimeStateSpace.h>
 
 namespace ob = ompl::base;
 namespace nd {
@@ -25,11 +26,19 @@ public:
 
     /** \brief Set the goal state */
     void setState(const ob::ScopedState<> &st);
+    void setUpperTimeBound(double utb)
+    {
+        upperTimeBound_ = utb;
+    }
 
 protected:
     /** \brief The goal state */
     ob::State *state_;
     ob::RealVectorStateSpace vectorStateSpace_;
+    double upperTimeBound_ = 0.0;
+
+    /** \brief The random number generator */
+    mutable ompl::RNG rng_;
 };
 }
 

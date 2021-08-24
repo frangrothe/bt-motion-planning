@@ -4,7 +4,7 @@
 #include "Time2D/Time2DPlanner.h"
 #include "Dubins/DubinsPlanner.h"
 #include "MotionQuery2D/QueryExecutor.h"
-#include "TimeND/TimeNDPlanner.h"
+#include "Benchmark/Benchmarker.h"
 #include "auxillary.h"
 
 int main(int argc, char* argv[]) {
@@ -46,8 +46,19 @@ int main(int argc, char* argv[]) {
             break;
         }
         case 5: {
-            nd::TimeNDPlanner planner{};
-            planner.planMotion();
+            nd::TimeNDPlanner planner{2};
+            planner.loadConfigFromJSON("a1.json");
+            planner.setPlanner(nd::TimeNDPlanner::SpaceTimeRRT);
+            planner.setSolveTime(10.0);
+//            planner.setUpperTimeBound(8.0);
+            planner.plan();
+            break;
+        }
+        case 6: {
+            nd::TimeNDPlanner planner{2};
+            planner.loadConfigFromJSON("a1.json");
+            planner.setSolveTime(10.0);
+            planner.benchmark();
             break;
         }
         default: {

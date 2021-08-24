@@ -25,9 +25,13 @@ double TimeNDGoal::distanceGoal(const ompl::base::State *st) const {
 
 void TimeNDGoal::sampleGoal(ompl::base::State *st) const {
     si_->copyState(st, state_);
+    if (upperTimeBound_ > 0) {
+        auto t = rng_.uniformReal(0.0, upperTimeBound_);
+        st->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position = t;
+    }
 }
 
 unsigned int TimeNDGoal::maxSampleCount() const {
-    return 1;
+    return upperTimeBound_ > 0 ? 1.0e9 : 1;
 }
 }

@@ -7,26 +7,57 @@
 namespace nd {
 
 TimeNDStateValidityChecker::TimeNDStateValidityChecker(const ompl::base::SpaceInformationPtr &si, int d,
-                                                       double constraintTime) : StateValidityChecker(si), d_(d),
-                                                                                constraintTime_(constraintTime) {}
+                                                       std::vector<TimeNDConstraint> constraints,
+                                                       ob::RealVectorBounds bounds, double agentRadius)
+        : StateValidityChecker(si), d_(d), constraints_(std::move(constraints)),
+          bounds_(std::move(bounds)), agentRadius_(agentRadius) {}
 
 bool TimeNDStateValidityChecker::isValid(const ompl::base::State *state) const {
 
-    auto t = state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
-    if (t > constraintTime_)
-        return true;
+    double t = state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+    double *values = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
 
-//    for (int i = 0; i < d_; ++i) {
-//        double v = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[i];
-//        if (v < 0.8 || v > 0.9)
-//            return true;
-//    }
-    double x = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
-    if (x < 0.8 || x > 0.9)
-        return true;
+    if (!isInBounds(values))
+        return false;
 
-    return false;
+    return hasCollision(values, t);
+}
 
+bool TimeNDStateValidityChecker::isInBounds(const double *values) const {
+    for (int i = 0; i < d_; ++i) {
+        if (values[i] < bounds_.low[i] + agentRadius_ || values[i] > bounds_.high[i] - agentRadius_)
+            return false;
+    }
+    return true;
+}
+
+bool TimeNDStateValidityChecker::hasCollision(const double *values, double t) const {
+    int i1 = std::floor(t);
+    int i2 = i1 + 1;
+    double frac = t - i1;
+    std::vector<double> direction(d_);
+    std::vector<double> res(d_);
+    for (auto &obstacle : constraints_) {
+        // calculate obstacle position
+        std::vector<double> v1 = obstacle.path[i1 % 8];
+        std::vector<double> v2 = obstacle.path[i2 % 8];
+        std::transform (v1.begin(), v1.end(), v2.begin(), direction.begin(), [] (auto &a, auto &b) {
+            return b - a;
+        });
+        std::transform (v1.begin(), v1.end(), direction.begin(), res.begin(), [frac] (auto &a, auto &b) {
+            return a + frac * b;
+        });
+
+        // calculate distance
+        double dist = 0.0;
+        for (int i = 0; i < d_; ++i) {
+            dist += (values[i] - res[i]) * (values[i] - res[i]);
+        }
+        if (sqrt(dist) < agentRadius_ + obstacle.radius)
+            return false;
+    }
+
+    return true;
 }
 }
 

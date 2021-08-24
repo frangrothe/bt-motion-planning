@@ -16,6 +16,7 @@
 #include <ompl/datastructures/NearestNeighborsGNATNoThreadSafety.h>
 #include <ompl/base/goals/GoalSampleableRegion.h>
 #include <ompl/util/GeometricEquations.h>
+#include <ompl/base/OptimizationObjective.h>
 
 #include "AnimationStateSpace.h"
 
@@ -146,6 +147,36 @@ protected:
         // only used by goal tree
         Motion *connectionPoint{nullptr}; // the start tree motion, if there is a direct connection
         int numConnections{0}; // number of connections to the start tree of self and all descendants
+    };
+
+    /** \brief Optimization Objective to minimize time at which any goal can be achieved.
+     * It is not possible to set a different optimization objective. */
+    class MinimizeGoalTime : public ob::OptimizationObjective
+    {
+    public:
+        explicit MinimizeGoalTime(const ob::SpaceInformationPtr &si) : OptimizationObjective(si) {}
+
+    private:
+        ob::Cost stateCost(const ompl::base::State *s) const override
+        {
+            return ob::Cost(s->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position);
+        }
+
+        ob::Cost motionCost(const ompl::base::State *s1, const ompl::base::State *s2) const override
+        {
+            return combineCosts(stateCost(s1), stateCost(s2));
+        }
+
+        ob::Cost combineCosts(ompl::base::Cost c1, ompl::base::Cost c2) const override
+        {
+            return c1.value() > c2.value() ? c1 : c2;
+        }
+
+        ob::Cost identityCost() const override
+        {
+            return ob::Cost(-std::numeric_limits<double>::infinity());
+        }
+
     };
 
     class ConditionalSampler : public ob::ValidStateSampler
@@ -309,7 +340,13 @@ protected:
     double distanceBetweenTrees_;
 
     /** \brief The current best solution path with respect to shortest time. */
-    ob::PathPtr bestSolution_;
+    ob::PathPtr bestSolution_{nullptr};
+
+    /** \brief The current best time i.e. cost of all found solutions */
+    double bestTime_ = std::numeric_limits<double>::infinity();
+
+    /** \brief The number of while loop iterations */
+    unsigned int numIterations_ = 0;
 
     /** \brief The number of found solutions */
     int numSolutions = 0;
@@ -323,9 +360,6 @@ protected:
     /** \brief The factor to which found solution times need to be reduced compared to minimum time, (0, 1]. */
     double optimumApproxFactor_ = 1.0;
 
-    /** \brief The difference, at which two doubles are considered equal. */
-    double epsilon_ = 1.0e-9;
-
     /** \brief The start Motion, used for conditional sampling and start tree pruning. */
     Motion * startMotion_{nullptr};
 
@@ -336,24 +370,24 @@ protected:
     std::vector<Motion *> newBatchGoalMotions_{};
 
     /**
-     * Gaol Sampling is not handled by PlannerInputStates, but directly by the SpaceTimeRRT,
-     * because the time component of every goal sample is sampled dependant on the sampled space component.
+     * Goal Sampling is not handled by PlannerInputStates, but directly by the SpaceTimeRRT,
+     * because the time component of every goal sample is sampled dependent on the sampled space component.
      *
      */
 
     ob::State *tempState_{nullptr}; // temporary sampled goal states are stored here.
 
     /** \brief N tries to sample a goal. */
-    ob::State * nextGoal(int n);
+    ob::State * nextGoal(int n, double oldBatchTimeBoundFactor, double newBatchTimeBoundFactor);
 
     /** \brief Samples a goal until successful or the termination condition is fulfilled. */
-    ob::State * nextGoal(const ob::PlannerTerminationCondition &ptc);
+    ob::State * nextGoal(const ob::PlannerTerminationCondition &ptc, double oldBatchTimeBoundFactor, double newBatchTimeBoundFactor);
 
     /** \brief Samples a goal until successful or the termination condition is fulfilled. */
-    ob::State * nextGoal(const ob::PlannerTerminationCondition &ptc, int n);
+    ob::State * nextGoal(const ob::PlannerTerminationCondition &ptc, int n, double oldBatchTimeBoundFactor, double newBatchTimeBoundFactor);
 
     /** \brief Samples the time component of a goal state dependant on its space component. Returns false, if goal can't be reached in time. */
-    bool sampleGoalTime(ob::State * goal);
+    bool sampleGoalTime(ob::State * goal, double oldBatchTimeBoundFactor, double newBatchTimeBoundFactor);
 
     /** \brief Removes the given motion from the parent's child list. */
     static void removeFromParent(Motion *m);
@@ -361,7 +395,7 @@ protected:
     /** \brief Adds given all descendants of the given motion to given tree and checks whether one of the added motions is the goal motion. */
     static void addDescendants(Motion *m, const TreeData &tree);
 
-    void constructSolution(Motion *startMotion, Motion *goalMotion);
+    void constructSolution(Motion *startMotion, Motion *goalMotion, const ob::ReportIntermediateSolutionFn &intermediateSolutionCallback);
 
     enum RewireState {
         // use r-disc search for rewiring
@@ -401,24 +435,27 @@ protected:
     /** \brief The factor, the time bound is increased with after the batch is full. */
     double timeBoundFactorIncrease_ = 2.0;
 
-    /** \brief Time Bound factor for the old batch. */
-    double oldBatchTimeBoundFactor_ = initialTimeBoundFactor_;
-
-    /** \brief Time Bound factor for the new batch. */
-    double newBatchTimeBoundFactor_ = initialTimeBoundFactor_;
-
     bool sampleOldBatch_ = true;
 
     /** \brief The ratio, a goal state is sampled compared to the size of the goal tree. */
     int goalStateSampleRatio_ = 4;
 
-    void writeSamplesToCSV(const std::string& type);
-    void writeSolutionToCSV();
-
     /** \brief The random number generator */
     ompl::RNG rng_;
 
+    ///////////////////////////////////////
+    // Planner progress property functions
+    std::string numIterationsProperty() const
+    {
+        return std::to_string(numIterations_);
+    }
+    std::string bestCostProperty() const
+    {
+        return std::to_string(bestTime_);
+    }
+
 };
+
 }
 
 

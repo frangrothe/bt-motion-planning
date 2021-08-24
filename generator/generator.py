@@ -16,17 +16,17 @@ def bounds_collision(pos, radius):
 class Generator:
     def __init__(self, dimensions):
         self.n = dimensions
-        self.n_obstacles = 10
+        self.n_obstacles = 100
         self.obstacles = []
         self.collision_granularity = 10
         self.start = np.array([])
         self.goal = np.array([])
         self.max_tries = 1000
-        self.volume_min = 0.0005
-        self.volume_max = 0.003
-        self.speed_min = 0.01
-        self.speed_max = 0.1
-        self.agent_radius = ((0.005 * math.gamma(self.n / 2.0 + 1.0)) / (math.pi ** (self.n / 2.0))) ** (1.0 / self.n)
+        self.radius_min = 0.01
+        self.radius_max = 0.05
+        self.speed_min_factor = 0.02
+        self.speed_max_factor = 0.2
+        self.agent_radius = 0.03
 
     def random_walk(self, start, start_time, v, radius):
         n_try = 0
@@ -50,7 +50,7 @@ class Generator:
         n_try = 0
         while n_try < self.max_tries:
             n_try += 1
-            pos = np.random.random(self.n)
+            pos = np.random.uniform(radius, 1.0 - radius, size=self.n)
             if self.has_collision(pos, radius, 0):
                 continue
             return pos
@@ -106,21 +106,26 @@ class Generator:
         # calculate radii bounds for the obstacle spheres
         # ranging from 0.5% to 5% of total volume
         # V_n(r) = (pi^(n/2)) / (gamma(n/2 + 1) * r^n
-        r_min = ((self.volume_min * math.gamma(self.n / 2.0 + 1.0)) / (math.pi ** (self.n / 2.0))) ** (1.0 / self.n)
-        r_max = ((self.volume_max * math.gamma(self.n / 2.0 + 1.0)) / (math.pi ** (self.n / 2.0))) ** (1.0 / self.n)
+        # r_min = ((self.volume_min * math.gamma(self.n / 2.0 + 1.0)) / (math.pi ** (self.n / 2.0))) ** (1.0 / self.n)
+        # r_max = ((self.volume_max * math.gamma(self.n / 2.0 + 1.0)) / (math.pi ** (self.n / 2.0))) ** (1.0 / self.n)
 
         # calculate bounds for speed
-        v_min = math.sqrt(self.n) * self.speed_min
-        v_max = math.sqrt(self.n) * self.speed_max
+        v_min = math.sqrt(self.n) * self.speed_min_factor
+        v_max = math.sqrt(self.n) * self.speed_max_factor
 
         for i in range(self.n_obstacles):
-            r = random.uniform(r_min, r_max)
+            print('obstacle ' + str(i))
+            r = random.uniform(self.radius_min, self.radius_max)
             v = random.uniform(v_min, v_max)
 
             first = self.sample_collision_free(r)
+            if first is None:
+                return
             path = [first]
             for j in range(4):
                 next_element = self.random_walk(path[j], j, v, r)
+                if next_element is None:
+                    return
                 path.append(next_element)
             for j in range(3, 0, -1):
                 path.append(path[j])
@@ -155,7 +160,7 @@ class Generator:
 
 
 if __name__ == '__main__':
-    dim = 10
+    dim = 3
     generator = Generator(dim)
     generator.generate_dataset()
 

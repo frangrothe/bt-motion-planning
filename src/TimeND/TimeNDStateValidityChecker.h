@@ -8,6 +8,7 @@
 #include <ompl/base/StateValidityChecker.h>
 #include <ompl/base/spaces/RealVectorStateSpace.h>
 #include <ompl/base/spaces/TimeStateSpace.h>
+#include "TimeNDConstraint.h"
 
 namespace ob = ompl::base;
 namespace nd {
@@ -15,14 +16,21 @@ namespace nd {
 class TimeNDStateValidityChecker : public ob::StateValidityChecker {
 public:
 
-    TimeNDStateValidityChecker(const ompl::base::SpaceInformationPtr &si, int d, double constraintTime);
+    TimeNDStateValidityChecker(const ompl::base::SpaceInformationPtr &si, int d,
+                               std::vector<TimeNDConstraint> constraints, ob::RealVectorBounds bounds,
+                               double agentRadius);
 
     bool isValid(const ompl::base::State *state) const override;
 
 private:
     int d_;
-    double constraintTime_;
 
+    std::vector<TimeNDConstraint> constraints_;
+    ob::RealVectorBounds bounds_;
+    double agentRadius_;
+
+    bool isInBounds(const double *values) const;
+    bool hasCollision(const double *values, double t) const;
 };
 }
 

@@ -6,7 +6,8 @@
 
 namespace space_time {
 
-AnimationStateSpace::AnimationStateSpace(const ob::StateSpacePtr& spaceComponent, double vMax, double timeWeight) : vMax_(vMax) {
+AnimationStateSpace::AnimationStateSpace(const ob::StateSpacePtr& spaceComponent, double vMax, double timeWeight) : vMax_(vMax)
+{
     if (timeWeight < 0 || timeWeight > 1)
         throw ompl::Exception("Error in AnimationStateSpace Construction: Time weight must be between 0 and 1");
 
@@ -20,7 +21,7 @@ double AnimationStateSpace::distance(const ompl::base::State *state1, const ompl
     double deltaSpace = distanceSpace(state1, state2);
     double deltaTime = distanceTime(state1, state2);
 
-    if (deltaSpace / vMax_ > deltaTime) return std::numeric_limits<double>::infinity();
+    if (deltaSpace / vMax_ > deltaTime + eps_) return std::numeric_limits<double>::infinity();
 
     return weights_[0] * deltaSpace + weights_[1] * deltaTime;
 
@@ -71,10 +72,20 @@ ob::TimeStateSpace * AnimationStateSpace::getTimeComponent() {
     return components_[1]->as<ob::TimeStateSpace>();
 }
 
-/*
- * No Metric State Space, as the triangle inequality is not satisfied
- */
 bool AnimationStateSpace::isMetricSpace() const {
     return false;
+}
+
+double AnimationStateSpace::getMaximumExtent() const {
+    return std::numeric_limits<double>::infinity();
+}
+
+void AnimationStateSpace::updateEpsilon() {
+    auto extent = getTimeComponent()->isBounded() ? getTimeComponent()->getMaximumExtent() : getSpaceComponent()->getMaximumExtent() / vMax_;
+    eps_ = std::numeric_limits<float>::epsilon() * std::pow(10, std::ceil(std::log10(extent)));
+}
+
+double AnimationStateSpace::getStateTime(const ompl::base::State *state) {
+    return state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
 }
 }
