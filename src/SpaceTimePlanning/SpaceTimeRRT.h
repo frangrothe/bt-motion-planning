@@ -8,6 +8,7 @@
 
 #include <fstream>
 #include <boost/math/constants/constants.hpp>
+#include <chrono>
 
 #include <ompl/tools/config/SelfConfig.h>
 #include <ompl/geometric/planners/PlannerIncludes.h>
@@ -124,6 +125,11 @@ public:
             OMPL_ERROR("%s: Batch Size needs to be at least 1.", getName().c_str());
         }
         initialBatchSize_ = v;
+    }
+
+    double getTimeToFirstSolution() const
+    {
+        return timeToFirstSolution_;
     }
 
     void setup() override;
@@ -349,7 +355,7 @@ protected:
     unsigned int numIterations_ = 0;
 
     /** \brief The number of found solutions */
-    int numSolutions = 0;
+    int numSolutions_ = 0;
 
     /** \brief Minimum Time at which any goal can be reached, if moving on a straight line. */
     double minimumTime_ = std::numeric_limits<double>::infinity();
@@ -426,6 +432,9 @@ protected:
     /** \brief Whether the time is bounded or not. The first solution automatically bounds the time. */
     bool isTimeBounded_;
 
+    /** \brief The time bound the planner is initialized with. Used to reset for repeated planning */
+    double initialTimeBound_;
+
     /** \brief Number of samples of the first batch */
     unsigned int initialBatchSize_ = 200;
 
@@ -442,6 +451,9 @@ protected:
 
     /** \brief The random number generator */
     ompl::RNG rng_;
+
+    std::chrono::time_point<std::chrono::steady_clock> startTime_;
+    double timeToFirstSolution_ = std::numeric_limits<double>::infinity();
 
     ///////////////////////////////////////
     // Planner progress property functions

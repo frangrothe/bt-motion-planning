@@ -16,7 +16,7 @@ def bounds_collision(pos, radius):
 class Generator:
     def __init__(self, dimensions):
         self.n = dimensions
-        self.n_obstacles = 100
+        self.n_obstacles = 5
         self.obstacles = []
         self.collision_granularity = 10
         self.start = np.array([])
@@ -160,12 +160,7 @@ class Generator:
 
 
 if __name__ == '__main__':
-    dim = 3
+    dim = 2
     generator = Generator(dim)
     generator.generate_dataset()
 
-    # a = [-5, -3, -2, -2, -1, -1, 0, 1, 1, 1, 2, 2, 3, 3, 4, 5]
-    # aaa = [-5, -3, -1, -1, -1, 0, 0, 0, 1, 1, 1, 2, 2, 2, 4, 6]
-    # print(len(a))
-    # print(np.mean(a))
-    # print(np.std(a))

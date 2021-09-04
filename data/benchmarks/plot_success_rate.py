@@ -1,60 +1,58 @@
 import sqlite3
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import curve_fit
+
+# colors
+col1 = '#d7191c'
+col2 = '#fdae61'
+col3 = '#ffffbf'
+col4 = '#abd9e9'
+col5 = '#2c7bb6'
+
+col_space_time_rrt = col5
 
 # general parameters
-resolution = 100
-times = np.linspace(0.0, 10.0, resolution)
+resolution = 200
+times = np.logspace(-2, 0.7, resolution)
 
-
-def exp_func(x, k):
-    return 100 - (100 * (np.e ** (-k * x)))
-
-def get_from_progress(cur):
-    count = cur.execute("SELECT COUNT(DISTINCT runid) FROM {}".format('progress')).fetchall()[0][0]
+def get_percentages_first_solution(cur):
+    count = cur.execute("SELECT COUNT(*) FROM {}".format('runs')).fetchall()[0][0]
 
     percentages = np.empty(len(times))
     for i in range(len(times)):
         percentage = cur.execute(
-            "SELECT COUNT(*) FROM (SELECT MIN(time) AS min_time "
-            "FROM {0} WHERE best_cost<>'NONE' GROUP BY runid) min_time_table WHERE min_time < {1}".format(
-                'progress', times[i])).fetchall()
+            "SELECT COUNT(*) FROM {0} WHERE time_first_solution < {1}".format('runs', times[i])).fetchall()
         percentages[i] = (percentage[0][0] / count) * 100
 
-    # create exponential fit
-    popt, pcov = curve_fit(exp_func, times, percentages)
-    yy = [exp_func(i, *popt) for i in times]
+    return percentages
 
-    return yy
+def get_percentages_time(cur):
 
-def get_from_runs(cur):
-    count = cur.execute("SELECT COUNT(*) FROM {} WHERE plannerid=1".format('runs')).fetchall()[0][0]
+    id = cur.execute("SELECT id FROM {} WHERE name='geometric_RRTConnect'".format('plannerConfigs')).fetchall()[0][0]
+    count = cur.execute("SELECT COUNT(*) FROM {} WHERE plannerid={}".format('runs', id)).fetchall()[0][0]
 
     percentages = np.empty(len(times))
     for i in range(len(times)):
         percentage = cur.execute(
-            "SELECT COUNT(*) FROM {0} WHERE plannerid=1 AND time < {1}".format('runs', times[i])).fetchall()
+            "SELECT COUNT(*) FROM {0} WHERE plannerid={2} AND time < {1}".format('runs', times[i], id)).fetchall()
         percentages[i] = (percentage[0][0] / count) * 100
-    popt, pcov = curve_fit(exp_func, times, percentages)
-    yy = [exp_func(i, *popt) for i in times]
 
-    return yy
+    return percentages
 
 def plot_succcess():
-
-    con = sqlite3.connect('2/a1.db')
+    # plot space time rrt
+    con = sqlite3.connect('2/a1_spacetime.db')
     cur = con.cursor()
-    connect_yy = get_from_runs(cur)
-    star_yy = get_from_progress(cur)
+    space_time_rrt = get_percentages_first_solution(cur)
 
-    con = sqlite3.connect('2/a1_spaceTime.db')
-    cur = con.cursor()
-    st_yy = get_from_progress(cur)
+    plt.xscale('log')
+    plt.xlim(0.01, 5.0)
 
-    plt.plot(times, star_yy, color='blue', label='RRTStar')
-    plt.plot(times, connect_yy, color='green', label='RRTConnect')
-    plt.plot(times, st_yy, color='coral', label='SpaceTimeRRT')
+    plt.yscale('linear')
+    plt.ylim(0.0, 100.0)
+
+    plt.scatter(times, space_time_rrt, color=col_space_time_rrt, label='SpaceTimeRRT')
+
     plt.legend()
     plt.xlabel("run time [s]")
     plt.ylabel("chance to find solution [%]")

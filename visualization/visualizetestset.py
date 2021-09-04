@@ -15,9 +15,9 @@ def open_json(name):
     return data
 
 def visualize():
-    filename = 'a1.json'
+    filename = 'a4.json'
     config_data = open_json(filename)
-    solution = open_json('solutionRRTConnect_' + filename)
+    solution = open_json('solution_' + filename)
 
     finish_time = solution[-1]['time']
     for time in range(int(finish_time) + 1):

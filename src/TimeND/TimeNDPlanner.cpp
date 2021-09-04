@@ -65,6 +65,18 @@ void TimeNDPlanner::plan() {
             ss.setPlanner(createRRTConnect(ss.getSpaceInformation())); break;
         case RRTStar:
             ss.setPlanner(createRRTStar(ss.getSpaceInformation())); break;
+        case LBTRRT:
+            ss.setPlanner(createLBTRRT(ss.getSpaceInformation())); break;
+        case LazyLBTRRT:
+            ss.setPlanner(createLazyLBTRRT(ss.getSpaceInformation())); break;
+        case TRRT:
+            ss.setPlanner(createTRRT(ss.getSpaceInformation())); break;
+        case BiTRRT:
+            ss.setPlanner(createBiTRRT(ss.getSpaceInformation())); break;
+        case PRMStar:
+            ss.setPlanner(ob::PlannerPtr(new og::PRMstar(ss.getSpaceInformation()))); break;
+        case LazyPRMStar:
+            ss.setPlanner(createLazyPRMStar(ss.getSpaceInformation())); break;
     }
     // Planner executes
     ob::PlannerStatus solved = ss.solve(solveTime_);
@@ -82,6 +94,8 @@ void TimeNDPlanner::plan() {
         std::cout << "\nExact Solution: " << (ss.haveExactSolutionPath()? "yes" : "no");
         std::cout << "\nApproximate Solution: " << (ss.haveSolutionPath() && !ss.haveExactSolutionPath()? "yes" : "no") << std::endl;
 
+//        writeSolutionToJSON(path);
+
     }
 }
 
@@ -95,12 +109,17 @@ void TimeNDPlanner::benchmark() {
 //    b.addExperimentParameter("num_dofs", "INTEGER", "6");
 //    b.addExperimentParameter("num_obstacles", "INTEGER", "10");
 
+    // We add the planners to evaluate.
+//    b.addPlanner(ob::PlannerPtr(new og::PRMstar(ss.getSpaceInformation())));
+
     // For planners that we want to configure in specific ways,
     // the ompl::base::PlannerAllocator should be used:
+
 //    b.addPlannerAllocator(std::bind(&TimeNDPlanner::createRRTConnect, this, std::placeholders::_1));
 //    b.addPlannerAllocator(std::bind(&TimeNDPlanner::createRRTStar, this, std::placeholders::_1));
     b.addPlannerAllocator(std::bind(&TimeNDPlanner::createSpaceTimeRRT, this, std::placeholders::_1));
-    // etc.
+
+    b.setPostRunEvent(std::bind(&TimeNDPlanner::RecordTimeSpaceTimeRRT, this, std::placeholders::_1, std::placeholders::_2));
 
     // Now we can benchmark: 5 second time limit for each plan computation,
     // 100 MB maximum memory usage per plan computation, 50 runs for each planner
@@ -109,12 +128,13 @@ void TimeNDPlanner::benchmark() {
     ompl::tools::Benchmark::Request req;
     req.maxTime = solveTime_;
     req.maxMem = 100.0;
-    req.runCount = 10;
+    req.runCount = 200;
     req.displayProgress = true;
+    req.timeBetweenUpdates = 0.01; // in seconds
     b.benchmark(req);
 
     // This will generate a file of the form ompl_host_time.log
-    b.saveResultsToFile("data/benchmarks/2/a1_benchmark_spaceTimeRRT.log");
+    b.saveResultsToFile("data/benchmarks/2/a1_spacetime.log");
 }
 
 void TimeNDPlanner::loadConfigFromJSON(const std::string& filename) {
@@ -159,7 +179,7 @@ void TimeNDPlanner::writeSolutionToJSON(const ompl::base::PathPtr &pathPtr) {
     }
 
     std::ostringstream oss;
-    oss << "data/testsets/" << d_ << "/" << "solutionRRTConnect_" << filename_;
+    oss << "data/testsets/" << d_ << "/" << "solution_" << filename_;
     // write prettified JSON to another file
     std::ofstream outfile(oss.str());
     outfile << std::setw(4) << fullJson << std::endl;
@@ -184,4 +204,45 @@ ompl::base::PlannerPtr TimeNDPlanner::createSpaceTimeRRT(const ompl::base::Space
     spaceTimeRRT->setBatchSize(batchSize_);
     return ob::PlannerPtr (spaceTimeRRT);
 }
+
+ompl::base::PlannerPtr TimeNDPlanner::createLBTRRT(const ompl::base::SpaceInformationPtr &si) {
+    auto *lbtrrt = new og::LBTRRT(si);
+    lbtrrt->setRange(plannerRangeFactor_ * sqrt(d_));
+    return ob::PlannerPtr(lbtrrt);
+}
+
+ompl::base::PlannerPtr TimeNDPlanner::createLazyLBTRRT(const ompl::base::SpaceInformationPtr &si) {
+    auto *lazylbtrrt = new og::LazyLBTRRT(si);
+    lazylbtrrt->setRange(plannerRangeFactor_ * sqrt(d_));
+    return ob::PlannerPtr(lazylbtrrt);
+}
+
+ompl::base::PlannerPtr TimeNDPlanner::createTRRT(const ompl::base::SpaceInformationPtr &si) {
+    auto *trrt = new og::TRRT(si);
+    trrt->setRange(plannerRangeFactor_ * sqrt(d_));
+    return ob::PlannerPtr(trrt);
+}
+
+ompl::base::PlannerPtr TimeNDPlanner::createBiTRRT(const ompl::base::SpaceInformationPtr &si) {
+    auto *bitrrt = new og::BiTRRT(si);
+    bitrrt->setRange(plannerRangeFactor_ * sqrt(d_));
+    return ob::PlannerPtr(bitrrt);
+}
+
+ompl::base::PlannerPtr TimeNDPlanner::createLazyPRMStar(const ompl::base::SpaceInformationPtr &si) {
+    auto *lazyprmstar = new og::LazyPRMstar(si);
+    lazyprmstar->setRange(plannerRangeFactor_ * sqrt(d_));
+    return ob::PlannerPtr(lazyprmstar);
+}
+
+void TimeNDPlanner::RecordTimeSpaceTimeRRT(const ob::PlannerPtr &planner, ompl::tools::Benchmark::RunProperties &run) {
+    double timeToFirstSolution = planner->as<space_time::SpaceTimeRRT>()->getTimeToFirstSolution();
+    run["time_first_solution REAL"] = std::to_string(timeToFirstSolution);
+}
+
+//void TimeNDPlanner::RecordTimeRRTS(const ompl::base::PlannerPtr &planner, ompl::tools::Benchmark::RunProperties &run) {
+//    double timeToFirstSolution = planner->as<og::RRTstar>()->getTimeToFirstSolution();
+//    run["time_first_solution REAL"] = std::to_string(timeToFirstSolution);
+//}
+
 }

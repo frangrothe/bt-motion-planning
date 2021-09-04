@@ -9,7 +9,7 @@
 #include <ompl/base/SpaceInformation.h>
 
 #include "DubinsGoalSampler.h"
-#include "../SpaceTimePlanning/AnimationStateSpace.h"
+#include "../../SpaceTimePlanning/AnimationStateSpace.h"
 
 namespace ob = ompl::base;
 namespace dubins {

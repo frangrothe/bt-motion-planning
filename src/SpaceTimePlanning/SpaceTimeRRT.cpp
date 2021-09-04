@@ -44,6 +44,7 @@ void SpaceTimeRRT::setup() {
         upperTimeBound_ = std::numeric_limits<double>::infinity();
         isTimeBounded_ = false;
     }
+    initialTimeBound_ = upperTimeBound_;
 
     si_->getStateSpace()->as<AnimationStateSpace>()->updateEpsilon();
     // Calculate some constants:
@@ -80,6 +81,7 @@ void SpaceTimeRRT::freeMemory() {
 
 ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc) {
 
+    startTime_ = std::chrono::steady_clock::now();
     checkValidity();
     auto *goal = dynamic_cast<ob::GoalSampleableRegion *>(pdef_->getGoal().get());
 
@@ -161,6 +163,7 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
             }
             OMPL_INFORM("%s: Increased time bound factor to %.2f", getName().c_str(),
                         newBatchTimeBoundFactor);
+            continue;
         }
 
         // determine whether the old or new batch is sampled
@@ -238,6 +241,7 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
             Motion *addedMotion = tgi.xmotion;
             Motion *startMotion;
             Motion *goalMotion;
+
 
             /* rewire the goal tree */
             bool newSolution = false;
@@ -495,7 +499,14 @@ void SpaceTimeRRT::constructSolution(SpaceTimeRRT::Motion *startMotion, SpaceTim
     if (newTime >= upperTimeBound_)
         return;
 
-    numSolutions++;
+    // store time to find the first solution for benchmarking
+    if (numSolutions_ == 0) {
+        auto endTime = std::chrono::steady_clock::now();
+        std::chrono::duration<double> diff = endTime - startTime_;
+        timeToFirstSolution_ = diff.count();
+    }
+
+    numSolutions_++;
     isTimeBounded_ = true;
     if (!newBatchGoalMotions_.empty()) {
         goalMotions_.insert(goalMotions_.end(), newBatchGoalMotions_.begin(), newBatchGoalMotions_.end());
@@ -737,19 +748,15 @@ void SpaceTimeRRT::clear() {
     bestTime_ = std::numeric_limits<double>::infinity();
     minimumTime_ = std::numeric_limits<double>::infinity();
     numIterations_ = 0;
+    numSolutions_ = 0;
     startMotion_ = nullptr;
     goalMotions_.clear();
     newBatchGoalMotions_.clear();
     tempState_ = nullptr;
     sampleOldBatch_ = true;
-
-    if (si_->getStateSpace()->as<space_time::AnimationStateSpace>()->getTimeComponent()->isBounded()) {
-        upperTimeBound_ = si_->getStateSpace()->as<space_time::AnimationStateSpace>()->getTimeComponent()->getMaxTimeBound();
-        isTimeBounded_ = true;
-    } else {
-        upperTimeBound_ = std::numeric_limits<double>::infinity();
-        isTimeBounded_ = false;
-    }
+    upperTimeBound_ = initialTimeBound_;
+    isTimeBounded_ = initialTimeBound_ != std::numeric_limits<double>::infinity();
+    timeToFirstSolution_ = std::numeric_limits<double>::infinity();
 }
 
 void SpaceTimeRRT::getPlannerData(ob::PlannerData &data) const {

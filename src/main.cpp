@@ -4,8 +4,8 @@
 #include "Time2D/Time2DPlanner.h"
 #include "Dubins/DubinsPlanner.h"
 #include "MotionQuery2D/QueryExecutor.h"
-#include "Benchmark/Benchmarker.h"
 #include "auxillary.h"
+#include "TimeND/TimeNDPlanner.h"
 
 int main(int argc, char* argv[]) {
 
@@ -57,7 +57,8 @@ int main(int argc, char* argv[]) {
         case 6: {
             nd::TimeNDPlanner planner{2};
             planner.loadConfigFromJSON("a1.json");
-            planner.setSolveTime(10.0);
+            planner.setSolveTime(5.0);
+            planner.setUpperTimeBound(-1.0);
             planner.benchmark();
             break;
         }
