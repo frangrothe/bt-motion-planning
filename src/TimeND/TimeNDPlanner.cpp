@@ -42,9 +42,8 @@ og::SimpleSetup TimeNDPlanner::createSimpleSetup() {
 
     auto goalRegion = std::make_shared<TimeNDGoal>(si, d_);
     goalRegion->setState(goal);
-    if (plannerType_ != SpaceTimeRRT) {
+    if (upperTimeBound_ > 0.0)
         goalRegion->setUpperTimeBound(upperTimeBound_);
-    }
 
     ss.setStartState(start);
     ss.setGoal(goalRegion);
@@ -114,12 +113,15 @@ void TimeNDPlanner::benchmark() {
 
     // For planners that we want to configure in specific ways,
     // the ompl::base::PlannerAllocator should be used:
-
-//    b.addPlannerAllocator(std::bind(&TimeNDPlanner::createRRTConnect, this, std::placeholders::_1));
-//    b.addPlannerAllocator(std::bind(&TimeNDPlanner::createRRTStar, this, std::placeholders::_1));
-    b.addPlannerAllocator(std::bind(&TimeNDPlanner::createSpaceTimeRRT, this, std::placeholders::_1));
-
-    b.setPostRunEvent(std::bind(&TimeNDPlanner::RecordTimeSpaceTimeRRT, this, std::placeholders::_1, std::placeholders::_2));
+    if (plannerType_ == SpaceTimeRRT) {
+        b.addPlannerAllocator(std::bind(&TimeNDPlanner::createSpaceTimeRRT, this, std::placeholders::_1));
+        b.setPostRunEvent(std::bind(&TimeNDPlanner::RecordTimeSpaceTimeRRT, this, std::placeholders::_1, std::placeholders::_2));
+    }
+    else {
+        b.addPlannerAllocator(std::bind(&TimeNDPlanner::createRRTConnect, this, std::placeholders::_1));
+        b.addPlannerAllocator(std::bind(&TimeNDPlanner::createRRTStar, this, std::placeholders::_1));
+        b.setPostRunEvent(std::bind(&TimeNDPlanner::RecordBestCost, this, std::placeholders::_1, std::placeholders::_2));
+    }
 
     // Now we can benchmark: 5 second time limit for each plan computation,
     // 100 MB maximum memory usage per plan computation, 50 runs for each planner
@@ -127,14 +129,17 @@ void TimeNDPlanner::benchmark() {
     // computation is running.
     ompl::tools::Benchmark::Request req;
     req.maxTime = solveTime_;
-    req.maxMem = 100.0;
-    req.runCount = 200;
+    req.maxMem = 2000.0;
+    req.runCount = 10;
     req.displayProgress = true;
-    req.timeBetweenUpdates = 0.01; // in seconds
+    req.timeBetweenUpdates = 0.001; // in seconds
     b.benchmark(req);
 
     // This will generate a file of the form ompl_host_time.log
-    b.saveResultsToFile("data/benchmarks/2/a1_spacetime.log");
+    std::ostringstream oss;
+    std::string s = plannerType_ == SpaceTimeRRT ? "spacetime" : std::to_string(int(upperTimeBound_));
+    oss << "data/benchmarks/" << d_ << "/test_b1_" << s << ".log";
+    b.saveResultsToFile(oss.str().c_str());
 }
 
 void TimeNDPlanner::loadConfigFromJSON(const std::string& filename) {
@@ -238,6 +243,14 @@ ompl::base::PlannerPtr TimeNDPlanner::createLazyPRMStar(const ompl::base::SpaceI
 void TimeNDPlanner::RecordTimeSpaceTimeRRT(const ob::PlannerPtr &planner, ompl::tools::Benchmark::RunProperties &run) {
     double timeToFirstSolution = planner->as<space_time::SpaceTimeRRT>()->getTimeToFirstSolution();
     run["time_first_solution REAL"] = std::to_string(timeToFirstSolution);
+}
+
+void TimeNDPlanner::RecordBestCost(const ompl::base::PlannerPtr &planner, ompl::tools::Benchmark::RunProperties &run) {
+    auto path = planner->getProblemDefinition()->getSolutionPath()->as<og::PathGeometric>();
+    auto lastState = path->getState(path->getStateCount() - 1);
+    double t = lastState->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+    run["cost REAL"] = std::to_string(t);
+
 }
 
 //void TimeNDPlanner::RecordTimeRRTS(const ompl::base::PlannerPtr &planner, ompl::tools::Benchmark::RunProperties &run) {

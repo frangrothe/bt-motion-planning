@@ -64,7 +64,7 @@ public:
 private:
     int d_; // dimensions
     double solveTime_ = 10.0;
-    double timeWeight_ = 0.99;
+    double timeWeight_ = 0.5;
     int batchSize_ = 200;
     double plannerRangeFactor_ = 0.2;
     double upperTimeBound_ = -std::numeric_limits<double>::infinity();
@@ -91,6 +91,7 @@ private:
 
     void RecordTimeSpaceTimeRRT(const ob::PlannerPtr &planner, ompl::tools::Benchmark::RunProperties &run);
     void RecordTimeRRTStar(const ob::PlannerPtr &planner, ompl::tools::Benchmark::RunProperties &run);
+    void RecordBestCost(const ob::PlannerPtr &planner, ompl::tools::Benchmark::RunProperties &run);
 
 };
 }

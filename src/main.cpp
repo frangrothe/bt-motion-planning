@@ -11,6 +11,8 @@ int main(int argc, char* argv[]) {
 
     std::string filename;
     int plannerType = 0;
+    std::string motionPlanner;
+    int timebound;
     if (argc < 2) {
         filename = auxillary::currentDateTime();
     }
@@ -19,6 +21,10 @@ int main(int argc, char* argv[]) {
     }
     if (argc > 2) {
         plannerType = std::stoi(argv[2]);
+    }
+    if (plannerType == 7) {
+        motionPlanner = argv[3];
+        timebound = std::stoi(argv[4]);
     }
 
     std::cout << "Planner Type is " << plannerType;
@@ -46,19 +52,33 @@ int main(int argc, char* argv[]) {
             break;
         }
         case 5: {
-            nd::TimeNDPlanner planner{2};
-            planner.loadConfigFromJSON("a1.json");
-            planner.setPlanner(nd::TimeNDPlanner::SpaceTimeRRT);
-            planner.setSolveTime(10.0);
-//            planner.setUpperTimeBound(8.0);
+            nd::TimeNDPlanner planner{8};
+            planner.loadConfigFromJSON("e500.json");
+            planner.setPlanner(nd::TimeNDPlanner::RRTConnect);
+            planner.setSolveTime(5.0);
+            planner.setUpperTimeBound(8.0);
             planner.plan();
             break;
         }
         case 6: {
             nd::TimeNDPlanner planner{2};
             planner.loadConfigFromJSON("a1.json");
-            planner.setSolveTime(5.0);
-            planner.setUpperTimeBound(-1.0);
+            planner.setPlanner(nd::TimeNDPlanner::RRTConnect);
+            planner.setSolveTime(10.0);
+            planner.setUpperTimeBound(8.0);
+            planner.benchmark();
+            break;
+        }
+        case 7: {
+            nd::TimeNDPlanner planner{8};
+            planner.loadConfigFromJSON("b1.json");
+            if (motionPlanner == "spacetime") {
+                planner.setPlanner(nd::TimeNDPlanner::SpaceTimeRRT);
+            } else {
+                planner.setPlanner(nd::TimeNDPlanner::RRTStar);
+            }
+            planner.setSolveTime(30.0);
+            planner.setUpperTimeBound(timebound);
             planner.benchmark();
             break;
         }

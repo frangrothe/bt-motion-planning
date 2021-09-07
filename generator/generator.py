@@ -16,15 +16,15 @@ def bounds_collision(pos, radius):
 class Generator:
     def __init__(self, dimensions):
         self.n = dimensions
-        self.n_obstacles = 5
+        self.n_obstacles = 1000
         self.obstacles = []
         self.collision_granularity = 10
         self.start = np.array([])
         self.goal = np.array([])
         self.max_tries = 1000
-        self.radius_min = 0.01
-        self.radius_max = 0.05
-        self.speed_min_factor = 0.02
+        self.radius_min = 0.07
+        self.radius_max = 0.13
+        self.speed_min_factor = 0.05
         self.speed_max_factor = 0.2
         self.agent_radius = 0.03
 
@@ -120,12 +120,12 @@ class Generator:
 
             first = self.sample_collision_free(r)
             if first is None:
-                return
+                return False
             path = [first]
             for j in range(4):
                 next_element = self.random_walk(path[j], j, v, r)
                 if next_element is None:
-                    return
+                    return False
                 path.append(next_element)
             for j in range(3, 0, -1):
                 path.append(path[j])
@@ -134,6 +134,7 @@ class Generator:
                  "path": path})
 
         self.export_to_json()
+        return True
 
     def export_to_json(self):
         d = {
@@ -160,7 +161,10 @@ class Generator:
 
 
 if __name__ == '__main__':
-    dim = 2
+    dim = 8
     generator = Generator(dim)
-    generator.generate_dataset()
+    solution = False
+    while not solution:
+        solution = generator.generate_dataset()
+
 
