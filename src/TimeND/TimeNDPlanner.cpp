@@ -119,7 +119,7 @@ void TimeNDPlanner::benchmark() {
     }
     else {
         b.addPlannerAllocator(std::bind(&TimeNDPlanner::createRRTConnect, this, std::placeholders::_1));
-        b.addPlannerAllocator(std::bind(&TimeNDPlanner::createRRTStar, this, std::placeholders::_1));
+//        b.addPlannerAllocator(std::bind(&TimeNDPlanner::createRRTStar, this, std::placeholders::_1));
         b.setPostRunEvent(std::bind(&TimeNDPlanner::RecordBestCost, this, std::placeholders::_1, std::placeholders::_2));
     }
 
@@ -129,16 +129,16 @@ void TimeNDPlanner::benchmark() {
     // computation is running.
     ompl::tools::Benchmark::Request req;
     req.maxTime = solveTime_;
-    req.maxMem = 2000.0;
-    req.runCount = 10;
+    req.maxMem = 4000.0;
+    req.runCount = 200;
     req.displayProgress = true;
-    req.timeBetweenUpdates = 0.001; // in seconds
+    req.timeBetweenUpdates = 0.002; // in seconds
     b.benchmark(req);
 
     // This will generate a file of the form ompl_host_time.log
     std::ostringstream oss;
     std::string s = plannerType_ == SpaceTimeRRT ? "spacetime" : std::to_string(int(upperTimeBound_));
-    oss << "data/benchmarks/" << d_ << "/test_b1_" << s << ".log";
+    oss << "data/benchmarks/" << d_ << "/cost_" << s << ".log";
     b.saveResultsToFile(oss.str().c_str());
 }
 

@@ -15,7 +15,10 @@
 #include <ompl/base/goals/GoalSpace.h>
 #include "ompl/geometric/planners/rrt/RRT.h"
 #include "ompl/geometric/planners/rrt/RRTConnect.h"
+#include <ompl/geometric/planners/rrt/RRTstar.h>
+#include <ompl/geometric/SimpleSetup.h>
 #include <ompl/base/ProblemDefinition.h>
+#include <ompl/tools/benchmark/Benchmark.h>
 
 
 #include "Time1DStateValidityChecker.h"
@@ -25,6 +28,7 @@
 
 #include "../SpaceTimePlanning/SpaceTimeRRT.h"
 #include "../SpaceTimePlanning/AnimationStateSpace.h"
+#include "../SpaceTimePlanning/MinimizeArrivalTime.h"
 
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
@@ -36,33 +40,60 @@ public:
     explicit Time1DPlanner(std::string filename);
 
     void planMotion();
+    void benchmark();
+
+    enum Planners {
+        SpaceTimeRRT,
+        RRTConnect,
+        RRTStar
+    };
+
+    void setUpperTimeBound(double tb)
+    {
+        timeBoundHigh_ = tb;
+    }
+
+    void setPlanner(Planners planner)
+    {
+        plannerType_ = planner;
+    }
 
 private:
     double xBoundLow_ = -2.0;
     double xBoundHigh_ = 2.0;
     double timeBoundLow_ = 0.0;
-    double timeBoundHigh_ = 3.0;
+    double timeBoundHigh_ = 2.0;
+
+    double initialTimeBoundFactor_ = 2;
 
     double xStart_ = 0.0;
     std::vector<std::pair<double, double>> goalRegions_ = {
-            {1.0, 1.05}
-//            {-1.2, -1.2}
+            {1.0, 1.1},
+            {-1.1, -1.0}
     };
 
     std::vector<Constraint> constraints_ {
-//            {0.05, 0.15, 0.16, 0.35},
-//            {0.5, 0.6, 0.51, 0.6},
-//            {0.5, 0.6, 0.71, 0.8},
-//            {0.5, 0.6, 1.01, 1.1},
-            {0.9, 1.1, 0.0, 30.0}
+            {0.4, 0.6, 0.0, 0.6},
+            {0.4, 0.6, 0.9, 2.0},
+            {-0.8, -0.6, 1.5, 1.7},
+            {-0.4, -0.2, 0.401, 0.8}
     };
     double vMax_ = 1.0; // 1 m/s
     double timeWeight_ = 0.5; // compared to distance weight used in distance function. [0,1]
-    double solveTime_ = 30.0; // in seconds
+    double solveTime_ = 2.0; // in seconds
     double plannerRange_ = 0.2;
+    Planners plannerType_ = SpaceTimeRRT;
 
     std::string filename_;
     std::string delim_ = ",";
+
+    og::SimpleSetup createSimpleSetup();
+    ompl::base::PlannerPtr createRRTConnect(const ompl::base::SpaceInformationPtr &si);
+    ompl::base::PlannerPtr createRRTStar(const ompl::base::SpaceInformationPtr &si);
+    ompl::base::PlannerPtr createSpaceTimeRRT(const ompl::base::SpaceInformationPtr &si);
+
+    void RecordTimeSpaceTimeRRT(const ob::PlannerPtr &planner, ompl::tools::Benchmark::RunProperties &run);
+    void RecordBestCost(const ob::PlannerPtr &planner, ompl::tools::Benchmark::RunProperties &run);
 
     void writeSamplesToCSV(const ob::PlannerData &data);
     void writePathToCSV(const ob::PathPtr &);

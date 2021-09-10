@@ -22,7 +22,7 @@ int main(int argc, char* argv[]) {
     if (argc > 2) {
         plannerType = std::stoi(argv[2]);
     }
-    if (plannerType == 7) {
+    if (plannerType == 7 || plannerType == 8) {
         motionPlanner = argv[3];
         timebound = std::stoi(argv[4]);
     }
@@ -70,14 +70,25 @@ int main(int argc, char* argv[]) {
             break;
         }
         case 7: {
-            nd::TimeNDPlanner planner{8};
-            planner.loadConfigFromJSON("b1.json");
+            nd::TimeNDPlanner planner{2};
+            planner.loadConfigFromJSON("a1.json");
             if (motionPlanner == "spacetime") {
                 planner.setPlanner(nd::TimeNDPlanner::SpaceTimeRRT);
             } else {
                 planner.setPlanner(nd::TimeNDPlanner::RRTStar);
             }
             planner.setSolveTime(30.0);
+            planner.setUpperTimeBound(timebound);
+            planner.benchmark();
+            break;
+        }
+        case 8: {
+            time_1d::Time1DPlanner planner{"placeholder"};
+            if (motionPlanner == "spacetime") {
+                planner.setPlanner(time_1d::Time1DPlanner::SpaceTimeRRT);
+            } else {
+                planner.setPlanner(time_1d::Time1DPlanner::RRTStar);
+            }
             planner.setUpperTimeBound(timebound);
             planner.benchmark();
             break;

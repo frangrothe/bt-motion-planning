@@ -1,28 +1,27 @@
+import os
 import sqlite3
 import numpy as np
 import matplotlib.pyplot as plt
 import json
 
 # colors
-col1 = '#d7191c'
-col2 = '#fdae61'
-col3 = '#ffffbf'
-col4 = '#abd9e9'
-col5 = '#2c7bb6'
+ibm_blue = '#648FFF'
+ibm_violet = '#785EF0'
+ibm_red = '#DC267F'
+ibm_orange = '#FE6100'
+ibm_yellow = '#FFB000'
 
-col_space_time_rrt = col1
-col_rrt_connect = col2
-col_rrt_star = col4
+col_space_time_rrt = ibm_blue
+col_rrt_connect = ibm_red
+col_rrt_star = ibm_orange
 
-filepath = '8/b1'
-min_time = 0.01
-max_time = 30
+filepath = 'narrow/n1'
 
 # general parameters
 resolution = 200
-times = np.logspace(np.log10(min_time), np.log10(max_time), resolution)
 
-def get_from_progress(cur):
+
+def get_from_progress(cur, times):
     count = cur.execute("SELECT COUNT(DISTINCT runid) FROM {}".format('progress')).fetchall()[0][0]
     percentages = np.empty(len(times))
     for i in range(len(times)):
@@ -33,7 +32,8 @@ def get_from_progress(cur):
         percentages[i] = (percentage[0][0] / count) * 100
     return percentages
 
-def get_percentages_first_solution(cur):
+
+def get_percentages_first_solution(cur, times):
     count = cur.execute("SELECT COUNT(*) FROM {}".format('runs')).fetchall()[0][0]
 
     percentages = np.empty(len(times))
@@ -44,8 +44,8 @@ def get_percentages_first_solution(cur):
 
     return percentages
 
-def get_percentages_time(cur):
 
+def get_percentages_time(cur, times):
     id = cur.execute("SELECT id FROM {} WHERE name='geometric_RRTConnect'".format('plannerConfigs')).fetchall()[0][0]
     count = cur.execute("SELECT COUNT(*) FROM {} WHERE plannerid={}".format('runs', id)).fetchall()[0][0]
 
@@ -57,93 +57,117 @@ def get_percentages_time(cur):
 
     return percentages
 
+
 def store_data():
+    with open(filepath + '.json', 'r') as jsonfile:
+        data = json.load(jsonfile)
+
     # plot space time rrt
+    times = np.logspace(np.log10(data["info"]["min_time"]["success"]), np.log10(data["info"]["max_time"]["success"]),
+                        resolution)
+
     con = sqlite3.connect(filepath + '_spacetime.db')
     cur = con.cursor()
-    space_time_rrt = get_percentages_first_solution(cur)
+    space_time_rrt = get_percentages_first_solution(cur, times)
+    # space_time_rrt = get_from_progress(cur)
 
-    # plot rrt connect and rrt star
-    con = sqlite3.connect(filepath + '_8.db')
-    cur = con.cursor()
-    rrt_connect8 = get_percentages_time(cur)
-    rrt_star8 = get_from_progress(cur)
+    rrt_connect = []
+    rrt_star = []
 
-    # plot rrt connect and rrt star
-    con = sqlite3.connect(filepath + '_32.db')
-    cur = con.cursor()
-    rrt_connect32 = get_percentages_time(cur)
-    rrt_star32 = get_from_progress(cur)
+    rrtconnect_tb = data["info"]["rrtconnect_tb"]
+    for i in range(len(rrtconnect_tb)):
+        con = sqlite3.connect(filepath + '_' + str(rrtconnect_tb[i]) + '.db')
+        cur = con.cursor()
+        rrt_connect.append(get_percentages_time(cur, times))
 
-    con = sqlite3.connect(filepath + '_128.db')
-    cur = con.cursor()
-    rrt_connect128 = get_percentages_time(cur)
-    rrt_star128 = get_from_progress(cur)
+    rrtstar_tb = data["info"]["rrtstar_tb"]
+    for i in range(len(rrtstar_tb)):
+        con = sqlite3.connect(filepath + '_' + str(rrtstar_tb[i]) + '.db')
+        cur = con.cursor()
+        rrt_star.append(get_from_progress(cur, times))
 
-    data = {
-        "spacetime" : {
-            "success" : space_time_rrt.tolist()
-        },
-        "rrtconnect8" : {
-            "success" : rrt_connect8.tolist()
-        },
-        "rrtconnect32": {
-            "success": rrt_connect32.tolist()
-        },
-        "rrtconnect128": {
-            "success": rrt_connect128.tolist()
-        },
-        "rrtstar8": {
-            "success": rrt_star8.tolist()
-        },
-        "rrtstar32": {
-            "success": rrt_star32.tolist()
-        },
-        "rrtstar128": {
-            "success": rrt_star128.tolist()
-        }
+    data["spacetime"] = {
+        "success": space_time_rrt.tolist()
     }
+    for i in range(len(rrtconnect_tb)):
+        data["rrtconnect" + str(rrtconnect_tb[i])] = {
+            "success": rrt_connect[i].tolist()
+        }
 
-    with open(filepath + '.json','w') as jsonfile:
+    for i in range(len(rrtstar_tb)):
+        data["rrtstar" + str(rrtstar_tb[i])] = {
+            "success": rrt_star[i].tolist()
+        }
+
+    with open(filepath + '.json', 'w') as jsonfile:
         json.dump(data, jsonfile, indent=4)
 
 
 def plot():
-    with open(filepath + '.json','r') as jsonfile:
+    with open(filepath + '.json', 'r') as jsonfile:
         data = json.load(jsonfile)
 
-    space_time_rrt = data["spacetime"]["success"]
-    rrt_connect8 = data["rrtconnect8"]["success"]
-    rrt_star8 = data["rrtstar8"]["success"]
-    rrt_connect32 = data["rrtconnect32"]["success"]
-    rrt_star32 = data["rrtstar32"]["success"]
-    rrt_connect128 = data["rrtconnect128"]["success"]
-    rrt_star128 = data["rrtstar128"]["success"]
+    min_time = data["info"]["min_time"]["success"]
+    max_time = data["info"]["max_time"]["success"]
+    times = np.logspace(np.log10(min_time), np.log10(max_time), resolution)
 
+    plt.style.use('../../test.mplstyle')
     plt.xscale('log')
     plt.xlim(min_time, max_time)
-
     plt.yscale('linear')
     plt.ylim(0.0, 100.0)
 
-    plt.plot(times, space_time_rrt, color=col_space_time_rrt, linestyle='-', label='SpaceTimeRRT')
-    plt.plot(times, rrt_connect8, color=col_rrt_connect, linestyle='-', label='RRTConnect 8')
-    plt.plot(times, rrt_connect32, color=col_rrt_connect, linestyle='--', label='RRTConnect 32')
-    plt.plot(times, rrt_connect128, color=col_rrt_connect, linestyle='dotted', label='RRTConnect 128')
-    plt.plot(times, rrt_star8, color=col_rrt_star, linestyle='-', label='RRTStar 8')
-    plt.plot(times, rrt_star32, color=col_rrt_star, linestyle='--', label='RRTStar 32')
-    plt.plot(times, rrt_star128, color=col_rrt_star, linestyle='dotted', label='RRTStar 128')
+    space_time_rrt = data["spacetime"]["success"]
+    plt.plot(times, space_time_rrt, color=col_space_time_rrt, linestyle='-', label='ST-RRT*')
 
+    linestyles = ['-', '--', 'dotted']
+    rrtconnect_tb = data["info"]["rrtconnect_tb"]
+    for i in range(len(rrtconnect_tb)):
+        rrt_connect = data["rrtconnect" + str(rrtconnect_tb[i])]["success"]
+        plt.plot(times, rrt_connect, color=col_rrt_connect, linestyle=linestyles[i],
+                 label='RRTConnect ' + str(rrtconnect_tb[i]))
+    rrtstar_tb = data["info"]["rrtstar_tb"]
+    for i in range(len(rrtstar_tb)):
+        rrt_star = data["rrtstar" + str(rrtstar_tb[i])]["success"]
+        plt.plot(times, rrt_star, color=col_rrt_star, linestyle=linestyles[i], label='RRT* ' + str(rrtstar_tb[i]))
     plt.legend()
+    plt.grid(True, which="both", ls='--')
     plt.xlabel("run time [s]")
-    plt.ylabel("success [%]")
+    plt.ylabel("success [\%]")
 
     # plt.show()
-    plt.savefig('dim8_success.png')
+    plt.savefig('narrow_success.pdf', format='pdf', dpi=300, bbox_inches='tight')
+
+
+def store_info():
+    dict = {
+        "min_time": {
+            "success": 0.0001,
+            "optimization": 0.001
+        },
+        "max_time": {
+            "success": 2.0,
+            "optimization": 2.0
+        },
+        "max_cost": 4,
+        "ci_left": 39,
+        "ci_right": 59,
+        "rrtconnect_tb": [1, 2, 4],
+        "rrtstar_tb": [1, 2, 4]
+    }
+    data = {}
+    if os.path.isfile(filepath + '.json'):
+        with open(filepath + '.json', 'r') as jsonfile:
+            data = json.load(jsonfile)
+
+    data["info"] = dict
+
+    with open(filepath + '.json', 'w') as jsonfile:
+        json.dump(data, jsonfile, indent=4)
 
 
 if __name__ == '__main__':
-
+    # store_info()
     # store_data()
     plot()
 

@@ -127,6 +127,28 @@ public:
         initialBatchSize_ = v;
     }
 
+    void setTimeBoundFactorIncrease(double f)
+    {
+        if (f <= 1.0) {
+            OMPL_ERROR("%s: Time Bound Factor Increase needs to be higher than 1.", getName().c_str());
+            OMPL_ERROR("%s: Time Bound Factor Increase needs to be higher than 1.", getName().c_str());
+        }
+        timeBoundFactorIncrease_ = f;
+    }
+
+    void setInitialTimeBoundFactor(double f)
+    {
+        if (f <= 1.0) {
+            OMPL_ERROR("%s: Initial Time Bound Factor Increase needs to be higher than 1.", getName().c_str());
+        }
+        initialTimeBoundFactor_ = f;
+    }
+
+    void setSampleUniformForUnboundedTime(bool uniform)
+    {
+        sampleUniformForUnboundedTime_ = uniform;
+    }
+
     double getTimeToFirstSolution() const
     {
         return timeToFirstSolution_;
@@ -412,7 +434,7 @@ protected:
         OFF
     };
 
-    RewireState rewireState_ = OFF;
+    RewireState rewireState_ = KNEAREST;
 
     /** \brief The rewiring factor, s, so that r_rrt = s \times r_rrt* > r_rrt* (or k_rrt = s \times k_rrt* >
              * k_rrt*) */
@@ -436,7 +458,7 @@ protected:
     double initialTimeBound_;
 
     /** \brief Number of samples of the first batch */
-    unsigned int initialBatchSize_ = 200;
+    unsigned int initialBatchSize_ = 512;
 
     /** \brief Initial factor, the minimum time of each goal is multiplied with to calculate the upper time bound. */
     double initialTimeBoundFactor_ = 2.0;
@@ -445,6 +467,9 @@ protected:
     double timeBoundFactorIncrease_ = 2.0;
 
     bool sampleOldBatch_ = true;
+
+    /** \brief Whether the samples are uniformly distributed over the whole space or are centered at lower times. */
+    bool sampleUniformForUnboundedTime_ = true;
 
     /** \brief The ratio, a goal state is sampled compared to the size of the goal tree. */
     int goalStateSampleRatio_ = 4;
@@ -465,6 +490,12 @@ protected:
     {
         return std::to_string(bestTime_);
     }
+
+    void writeSamplesToCSV(const ob::PlannerData &data, int n);
+    void writePathToCSV(const ob::PathPtr &path);
+    std::vector<int> samplesToDraw_{
+        5, 10, 20, 50, 100, 250
+    };
 
 };
 

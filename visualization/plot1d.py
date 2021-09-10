@@ -29,10 +29,12 @@ x_ub_index = 1
 t_lb_index = 2
 t_ub_index = 3
 
+time_ub = 2048
+
 def plot_motion_plan(filename):
     df_samples = read_csv('data/' + filename + '/samples.csv')
     df_constraints = read_csv('data/' + filename + '/constraints.csv')
-    df_path = read_csv('data/' + filename + '/path.csv')
+    # df_path = read_csv('data/' + filename + '/path.csv')
     df_goal = read_csv('data/' + filename + '/goal.csv')
 
     # draw base graph
@@ -40,28 +42,30 @@ def plot_motion_plan(filename):
         in_edges = [int(x) for x in df_samples.iloc[i, in_edge_index].split('#') if x]
         for e in in_edges:
             plt.plot([df_samples.iloc[i, x_index], df_samples.iloc[e, x_index]],
-                     [df_samples.iloc[i, t_index], df_samples.iloc[e, t_index]], '.-k')
+                     [df_samples.iloc[i, t_index], df_samples.iloc[e, t_index]], '.-k', markersize=1)
     # plot solution path
-    plt.plot(df_path['x'].to_numpy(), df_path['time'].to_numpy(), 'D-', linewidth=2, color=ibm_red)
-    print('\nSolution Path Length: ' + str(len(df_path.index)))
+    # plt.plot(df_path['x'].to_numpy(), df_path['time'].to_numpy(), 'D-', linewidth=2, color=ibm_red, markersize=1)
+    # print('\nSolution Path Length: ' + str(len(df_path.index)))
 
     # draw constraints
     current_axis = plt.gca()
     for i in range(len(df_constraints.index)):
         x_lb = df_constraints.iloc[i, x_lb_index]
         t_lb = df_constraints.iloc[i, t_lb_index]
+        t_ub = time_ub if df_constraints.iloc[i, t_ub_index] > time_ub else df_constraints.iloc[i, t_ub_index]
         x_diff = df_constraints.iloc[i, x_ub_index] - df_constraints.iloc[i, x_lb_index]
-        t_diff = df_constraints.iloc[i, t_ub_index] - df_constraints.iloc[i, t_lb_index]
+        t_diff = t_ub - df_constraints.iloc[i, t_lb_index]
         current_axis.add_patch(Rectangle((x_lb, t_lb), x_diff, t_diff, facecolor=ibm_blue))
 
     # draw goal region
     for i in range(len(df_goal.index)):
         x_diff = df_goal.iloc[i, x_ub_index] - df_goal.iloc[i, x_lb_index]
-        t_diff = df_goal.iloc[i, t_ub_index] - df_goal.iloc[i, t_lb_index]
+        t_ub = time_ub if df_goal.iloc[i, t_ub_index] > time_ub else df_goal.iloc[i, t_ub_index]
+        t_diff = t_ub - df_goal.iloc[i, t_lb_index]
         if x_diff == 0:
             x_diff = 0.0001
         current_axis.add_patch(
-            Rectangle((df_goal.iloc[i, x_lb_index], df_goal.iloc[i, t_lb_index]), x_diff, t_diff, facecolor=ibm_yellow))
+            Rectangle((df_goal.iloc[i, x_lb_index], df_goal.iloc[i, t_lb_index]), x_diff, t_diff, facecolor=ibm_yellow, zorder=500))
 
 
     # create handles for the legend
@@ -75,17 +79,21 @@ def plot_motion_plan(filename):
     plt.legend(handles=[sample_line, path_line, constraint_patch, goal_patch])
     plt.xlabel("distance x")
     plt.ylabel("time t")
+    plt.ylim([0, time_ub])
+    plt.title('Narrow Passage: Nonuniform Sampling')
     plt.show()
+    # plt.savefig('narrowpasseuniform.png')
 
 def load_csv(filename):
     df = read_csv('data/' + filename + '.csv')
-    print(df)
+    # print(df)
     return df
 
 
 # Call with csv file to plot as command line argument
 if __name__ == '__main__':
-    filename = sys.argv[1]
+    # filename = sys.argv[1]
+    filename = 'narrow_nonuniform'
 
     plot_motion_plan(filename)
 

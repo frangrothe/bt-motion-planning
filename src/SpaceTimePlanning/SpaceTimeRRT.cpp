@@ -138,8 +138,15 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
     OMPL_INFORM("%s: Starting planning with time bound factor %.2f", getName().c_str(),
                 newBatchTimeBoundFactor);
 
+    int storeIndex = 0;
     while (!ptc)
     {
+        if (storeIndex < samplesToDraw_.size() && numBatchSamples >= samplesToDraw_[storeIndex]) {
+            ++storeIndex;
+            ob::PlannerData data(si_);
+            getPlannerData(data);
+            writeSamplesToCSV(data, numBatchSamples);
+        }
         numIterations_++;
         TreeData &tree = startTree ? tStart_ : tGoal_;
         tgi.start = startTree;
@@ -155,7 +162,8 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
             oldBatchTimeBoundFactor = newBatchTimeBoundFactor;
             newBatchTimeBoundFactor *= timeBoundFactorIncrease_;
             startTree = true;
-            batchSize = std::ceil(2.0 * (timeBoundFactorIncrease_ - 1.0) * static_cast<double>(tStart_->size() + tGoal_->size()));
+            if (sampleUniformForUnboundedTime_)
+                batchSize = std::ceil(2.0 * (timeBoundFactorIncrease_ - 1.0) * static_cast<double>(tStart_->size() + tGoal_->size()));
             numBatchSamples = 0;
             if (!newBatchGoalMotions_.empty()) {
                 goalMotions_.insert(goalMotions_.end(), newBatchGoalMotions_.begin(), newBatchGoalMotions_.end());
@@ -167,7 +175,7 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
         }
 
         // determine whether the old or new batch is sampled
-        sampleOldBatch_ = (firstBatch || isTimeBounded_ || rng_.uniform01() <= oldBatchSampleProb);
+        sampleOldBatch_ = (firstBatch || isTimeBounded_ || !sampleUniformForUnboundedTime_ || rng_.uniform01() <= oldBatchSampleProb);
 
         ob::State *goalState{nullptr};
         if (sampleOldBatch_) {
@@ -182,7 +190,8 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
                     newBatchTimeBoundFactor *= timeBoundFactorIncrease_;
                     oldBatchTimeBoundFactor = newBatchTimeBoundFactor;
                     startTree = true;
-                    batchSize = std::ceil(2.0 * (timeBoundFactorIncrease_ - 1.0) * static_cast<double>(tStart_->size() + tGoal_->size()));
+                    if (sampleUniformForUnboundedTime_)
+                        batchSize = std::ceil(2.0 * (timeBoundFactorIncrease_ - 1.0) * static_cast<double>(tStart_->size() + tGoal_->size()));
                     numBatchSamples = 0;
                     OMPL_INFORM("%s: Increased time bound factor to %.2f", getName().c_str(),
                                 newBatchTimeBoundFactor);
@@ -306,6 +315,12 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
             {
 
                 constructSolution(startMotion, goalMotion, intermediateSolutionCallback);
+                if (!solved) {
+                    ob::PlannerData data(si_);
+                    getPlannerData(data);
+                    writeSamplesToCSV(data, numBatchSamples);
+                    writePathToCSV(bestSolution_);
+                }
                 solved = true;
                 if (!optimize_ || upperTimeBound_ == minimumTime_) break; // first solution is enough or optimal solution is found
                 // continue to look for solutions with the narrower time bound until the termination condition is met
@@ -555,6 +570,8 @@ void SpaceTimeRRT::constructSolution(SpaceTimeRRT::Motion *startMotion, SpaceTim
 
     // Update Time Limit
     upperTimeBound_ = (bestTime_ - minimumTime_ ) * optimumApproxFactor_ + minimumTime_;
+
+    if (!optimize_) return;
     // Prune Start and Goal Trees
     pruneStartTree();
     Motion* newSolution = pruneGoalTree();
@@ -968,6 +985,60 @@ ob::State *SpaceTimeRRT::nextGoal(const ob::PlannerTerminationCondition &ptc, in
     }
 
     return nullptr;
+}
+
+void SpaceTimeRRT::writeSamplesToCSV(const ob::PlannerData &data, int n) {
+    std::ofstream outfile ("data/cover_plot/" + std::to_string(n) + "_samples.csv");
+    std::string delim = ",";
+
+    outfile << "x" << delim << "time" << delim << "incoming edge" << delim << "outgoing edges" << delim << "tag\n";
+
+    for (int i = 0; i < data.numVertices(); ++i) {
+        double x = data.getVertex(i).getState()->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
+        double t = data.getVertex(i).getState()->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+
+
+        // Get incoming edges for node
+        std::vector< unsigned int > inEdgeIndexes{};
+        data.getIncomingEdges(i, inEdgeIndexes);
+        std::stringstream ssIn;
+        for (auto edgeIndex : inEdgeIndexes) {
+            ssIn << "#" << edgeIndex;
+        }
+        std::string inEdges = inEdgeIndexes.empty()? "#" : ssIn.str();
+
+        // Get outgoing edges for node
+        std::vector< unsigned int > outEdgeIndexes{};
+        data.getEdges(i, outEdgeIndexes);
+        std::stringstream ssOut;
+        for (auto edgeIndex : outEdgeIndexes) {
+            ssOut << "#" << edgeIndex;
+        }
+        std::string outEdges = outEdgeIndexes.empty()? "#" : ssOut.str();
+        int tag = data.getVertex(i).getTag();
+
+        // write node data to csv
+        outfile << x << delim << t << delim << inEdges << delim << outEdges << delim << tag << "\n";
+
+    }
+
+    outfile.close();
+}
+
+void SpaceTimeRRT::writePathToCSV(const ompl::base::PathPtr &pathPointer) {
+    std::ofstream outfile ("data/cover_plot/first_solution.csv");
+    std::string delim = ",";
+
+    outfile << "x" << delim << "time\n";
+
+    auto path = pathPointer->as<og::PathGeometric>();
+    for (auto state : path->getStates()) {
+        double x = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values[0];
+        double t = state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+        outfile << x << delim << t << "\n";
+    }
+
+    outfile.close();
 }
 
 }
