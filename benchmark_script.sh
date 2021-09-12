@@ -5,7 +5,7 @@
 cd src/cmake-build-debug
 make
 cd ../..
-# src/cmake-build-debug/bt_robotics "testing" "7" "spacetime" "-1"
-src/cmake-build-debug/bt_robotics "testing" "7" "rrt" "8"
-src/cmake-build-debug/bt_robotics "testing" "7" "rrt" "32"
-src/cmake-build-debug/bt_robotics "testing" "7" "rrt" "128"
+#src/cmake-build-debug/bt_robotics "testing" "7" "spacetime" "4"
+src/cmake-build-debug/bt_robotics "testing" "7" "rrt" "1"
+src/cmake-build-debug/bt_robotics "testing" "7" "rrt" "2"
+src/cmake-build-debug/bt_robotics "testing" "7" "rrt" "4"

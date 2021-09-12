@@ -51,5 +51,5 @@ add_executable(bt_robotics
         TimeND/TimeNDGoal.cpp TimeND/TimeNDGoal.h
         TimeND/TimeNDConstraint.h
         SpaceTimePlanning/MinimizeArrivalTime.cpp SpaceTimePlanning/MinimizeArrivalTime.h
-        )
+        TimeND/TimeNDNarrowPassageValidityChecker.cpp TimeND/TimeNDNarrowPassageValidityChecker.h)
 

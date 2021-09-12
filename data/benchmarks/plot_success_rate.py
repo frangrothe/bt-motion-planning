@@ -15,7 +15,7 @@ col_space_time_rrt = ibm_blue
 col_rrt_connect = ibm_red
 col_rrt_star = ibm_orange
 
-filepath = 'narrow/n1'
+# filepath = 'narrow8/n8'
 
 # general parameters
 resolution = 200
@@ -58,7 +58,7 @@ def get_percentages_time(cur, times):
     return percentages
 
 
-def store_data():
+def store_success_data(filepath):
     with open(filepath + '.json', 'r') as jsonfile:
         data = json.load(jsonfile)
 
@@ -68,8 +68,8 @@ def store_data():
 
     con = sqlite3.connect(filepath + '_spacetime.db')
     cur = con.cursor()
-    space_time_rrt = get_percentages_first_solution(cur, times)
-    # space_time_rrt = get_from_progress(cur)
+    # space_time_rrt = get_percentages_first_solution(cur, times)
+    space_time_rrt = get_from_progress(cur, times)
 
     rrt_connect = []
     rrt_star = []
@@ -103,73 +103,52 @@ def store_data():
         json.dump(data, jsonfile, indent=4)
 
 
-def plot():
-    with open(filepath + '.json', 'r') as jsonfile:
-        data = json.load(jsonfile)
+def plot_success(ax, data, colors, linestyles):
 
     min_time = data["info"]["min_time"]["success"]
     max_time = data["info"]["max_time"]["success"]
     times = np.logspace(np.log10(min_time), np.log10(max_time), resolution)
 
-    plt.style.use('../../test.mplstyle')
-    plt.xscale('log')
-    plt.xlim(min_time, max_time)
-    plt.yscale('linear')
-    plt.ylim(0.0, 100.0)
+
+    ax.set_xscale('log')
+    ax.set_yscale('linear')
+    ax.set_xlim(min_time, max_time)
+    ax.set_ylim(0.0, 100.0)
 
     space_time_rrt = data["spacetime"]["success"]
-    plt.plot(times, space_time_rrt, color=col_space_time_rrt, linestyle='-', label='ST-RRT*')
+    ax.plot(times, space_time_rrt, color=colors["spacetime"], linestyle='-', label='ST-RRT*')
 
-    linestyles = ['-', '--', 'dotted']
+
     rrtconnect_tb = data["info"]["rrtconnect_tb"]
     for i in range(len(rrtconnect_tb)):
         rrt_connect = data["rrtconnect" + str(rrtconnect_tb[i])]["success"]
-        plt.plot(times, rrt_connect, color=col_rrt_connect, linestyle=linestyles[i],
-                 label='RRTConnect ' + str(rrtconnect_tb[i]))
+        ax.plot(times, rrt_connect, color=colors["rrtconnect"], linestyle=linestyles[i],
+                        label='RRTConnect ' + str(rrtconnect_tb[i]))
     rrtstar_tb = data["info"]["rrtstar_tb"]
     for i in range(len(rrtstar_tb)):
         rrt_star = data["rrtstar" + str(rrtstar_tb[i])]["success"]
-        plt.plot(times, rrt_star, color=col_rrt_star, linestyle=linestyles[i], label='RRT* ' + str(rrtstar_tb[i]))
-    plt.legend()
-    plt.grid(True, which="both", ls='--')
-    plt.xlabel("run time [s]")
-    plt.ylabel("success [\%]")
+        ax.plot(times, rrt_star, color=colors["rrtstar"], linestyle=linestyles[i], label='RRT* ' + str(rrtstar_tb[i]))
 
-    # plt.show()
-    plt.savefig('narrow_success.pdf', format='pdf', dpi=300, bbox_inches='tight')
+    ax.grid(True, which="both", ls='--')
+    ax.set_ylabel("success [\%]")
 
-
-def store_info():
-    dict = {
-        "min_time": {
-            "success": 0.0001,
-            "optimization": 0.001
-        },
-        "max_time": {
-            "success": 2.0,
-            "optimization": 2.0
-        },
-        "max_cost": 4,
-        "ci_left": 39,
-        "ci_right": 59,
-        "rrtconnect_tb": [1, 2, 4],
-        "rrtstar_tb": [1, 2, 4]
-    }
+def store_info(filepath, info):
     data = {}
     if os.path.isfile(filepath + '.json'):
         with open(filepath + '.json', 'r') as jsonfile:
             data = json.load(jsonfile)
 
-    data["info"] = dict
+    data["info"] = info
 
     with open(filepath + '.json', 'w') as jsonfile:
         json.dump(data, jsonfile, indent=4)
 
 
 if __name__ == '__main__':
+    filepath = '2/a1'
     # store_info()
     # store_data()
-    plot()
+    # plot()
 
     # tables = cur.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").fetchall()
     # for table in tables:

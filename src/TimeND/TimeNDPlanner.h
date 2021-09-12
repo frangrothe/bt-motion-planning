@@ -31,6 +31,7 @@
 #include "TimeNDStateValidityChecker.h"
 #include "TimeNDMotionValidator.h"
 #include "TimeNDGoal.h"
+#include "TimeNDNarrowPassageValidityChecker.h"
 #include "../json.h"
 
 namespace og = ompl::geometric;
@@ -65,8 +66,8 @@ private:
     int d_; // dimensions
     double solveTime_ = 10.0;
     double timeWeight_ = 0.5;
-    int batchSize_ = 200;
-    double plannerRangeFactor_ = 0.2;
+    int batchSize_ = 1024;
+    double plannerRangeFactor_ = 0.1;
     double upperTimeBound_ = -std::numeric_limits<double>::infinity();
 
     std::vector<double> startPosition_;

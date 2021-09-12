@@ -2,7 +2,7 @@ import json
 import sqlite3
 import numpy as np
 
-filepath = 'narrow/n1'
+# filepath = 'narrow8/n8'
 
 def get_from_progress(cur, ci_left, ci_right):
     pair = np.array(cur.execute("SELECT MIN(time), best_cost FROM {0} WHERE best_cost<>'NONE' GROUP BY runid".format('progress')).fetchall())
@@ -38,7 +38,7 @@ def max_point(max_time, max_cost):
             "cost": [max_cost, max_cost, max_cost]}
     return data
 
-def store_data():
+def store_points(filepath):
     with open(filepath + '.json', 'r') as jsonfile:
         data = json.load(jsonfile)
 
@@ -47,10 +47,10 @@ def store_data():
     max_time = data["info"]["max_time"]["optimization"]
     max_cost = data["info"]["max_cost"]
 
-    con = sqlite3.connect(filepath + '_spacetime.db')
-    cur = con.cursor()
-    space_time_rrt = get_from_progress(cur, ci_left, ci_right)
-    data["spacetime"]["point"] = space_time_rrt
+    # con = sqlite3.connect(filepath + '_spacetime.db')
+    # cur = con.cursor()
+    # space_time_rrt = get_from_progress(cur, ci_left, ci_right)
+    # data["spacetime"]["point"] = space_time_rrt
 
     rrtconnect_tb = data["info"]["rrtconnect_tb"]
     for i in range(len(rrtconnect_tb)):
@@ -61,18 +61,19 @@ def store_data():
             rrt_connect = max_point(max_time, max_cost)
         data["rrtconnect" + str(rrtconnect_tb[i])]["point"] = rrt_connect
 
-    rrtstar_tb = data["info"]["rrtstar_tb"]
-    for i in range(len(rrtstar_tb)):
-        con = sqlite3.connect(filepath + '_' + str(rrtstar_tb[i]) + '.db')
-        cur = con.cursor()
-        rrt_star = get_from_progress(cur, ci_left, ci_right)
-        if rrt_star is None:
-            rrt_star = max_point(max_time, max_cost)
-        data["rrtstar" + str(rrtstar_tb[i])]["point"] = rrt_star
+    # rrtstar_tb = data["info"]["rrtstar_tb"]
+    # for i in range(len(rrtstar_tb)):
+    #     con = sqlite3.connect(filepath + '_' + str(rrtstar_tb[i]) + '.db')
+    #     cur = con.cursor()
+    #     rrt_star = get_from_progress(cur, ci_left, ci_right)
+    #     if rrt_star is None:
+    #         rrt_star = max_point(max_time, max_cost)
+    #     data["rrtstar" + str(rrtstar_tb[i])]["point"] = rrt_star
 
     with open(filepath + '.json','w') as jsonfile:
         json.dump(data, jsonfile, indent=4)
 
 
 if __name__ == '__main__':
-    store_data()
+    filepath = '2/cost'
+    store_points(filepath)

@@ -53,10 +53,10 @@ int main(int argc, char* argv[]) {
         }
         case 5: {
             nd::TimeNDPlanner planner{8};
-            planner.loadConfigFromJSON("e500.json");
-            planner.setPlanner(nd::TimeNDPlanner::RRTConnect);
-            planner.setSolveTime(5.0);
-            planner.setUpperTimeBound(8.0);
+//            planner.loadConfigFromJSON("e500.json");
+            planner.setPlanner(nd::TimeNDPlanner::SpaceTimeRRT);
+            planner.setSolveTime(20.0);
+//            planner.setUpperTimeBound(8.0);
             planner.plan();
             break;
         }
@@ -70,8 +70,8 @@ int main(int argc, char* argv[]) {
             break;
         }
         case 7: {
-            nd::TimeNDPlanner planner{2};
-            planner.loadConfigFromJSON("a1.json");
+            nd::TimeNDPlanner planner{8};
+//            planner.loadConfigFromJSON("a1.json");
             if (motionPlanner == "spacetime") {
                 planner.setPlanner(nd::TimeNDPlanner::SpaceTimeRRT);
             } else {

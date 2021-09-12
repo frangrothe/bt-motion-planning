@@ -134,19 +134,13 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
     double oldBatchSampleProb = 1.0; // probability to sample the old batch region
     double oldBatchTimeBoundFactor = initialTimeBoundFactor_; // Time Bound factor for the old batch.
     double newBatchTimeBoundFactor = initialTimeBoundFactor_; // Time Bound factor for the new batch.
+    bool forceGoalSample = true;
 
     OMPL_INFORM("%s: Starting planning with time bound factor %.2f", getName().c_str(),
                 newBatchTimeBoundFactor);
 
-    int storeIndex = 0;
     while (!ptc)
     {
-        if (storeIndex < samplesToDraw_.size() && numBatchSamples >= samplesToDraw_[storeIndex]) {
-            ++storeIndex;
-            ob::PlannerData data(si_);
-            getPlannerData(data);
-            writeSamplesToCSV(data, numBatchSamples);
-        }
         numIterations_++;
         TreeData &tree = startTree ? tStart_ : tGoal_;
         tgi.start = startTree;
@@ -199,8 +193,11 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
                 }
             }
             // sample for a single try
-            else if (goalMotions_.size() < (tGoal_->size() - newBatchGoalSamples) / goalStateSampleRatio_)
+            else if (forceGoalSample || goalMotions_.size() < (tGoal_->size() - newBatchGoalSamples) / goalStateSampleRatio_) {
                 goalState = nextGoal(1, oldBatchTimeBoundFactor, newBatchTimeBoundFactor);
+                forceGoalSample = false;
+            }
+
         }
         else {
             if (newBatchGoalMotions_.empty()) {
@@ -217,8 +214,10 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
                     continue;
                 }
             }
-            else if (newBatchGoalMotions_.size() < newBatchGoalSamples / goalStateSampleRatio_)
+            else if (forceGoalSample || newBatchGoalMotions_.size() < newBatchGoalSamples / goalStateSampleRatio_) {
                 goalState = nextGoal(1, oldBatchTimeBoundFactor, newBatchTimeBoundFactor);
+                forceGoalSample = false;
+            }
         }
 
         if (goalState != nullptr) {
@@ -239,7 +238,11 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
         }
 
         /* sample random state */
-        sampler_.sample(rstate);
+        bool success = sampler_.sample(rstate);
+        if (!success) {
+            forceGoalSample = true;
+            continue;
+        }
 
         // EXTEND
         GrowState gs = growTree(tree, tgi, rmotion, nbh, false);
@@ -315,12 +318,6 @@ ob::PlannerStatus SpaceTimeRRT::solve(const ob::PlannerTerminationCondition &ptc
             {
 
                 constructSolution(startMotion, goalMotion, intermediateSolutionCallback);
-                if (!solved) {
-                    ob::PlannerData data(si_);
-                    getPlannerData(data);
-                    writeSamplesToCSV(data, numBatchSamples);
-                    writePathToCSV(bestSolution_);
-                }
                 solved = true;
                 if (!optimize_ || upperTimeBound_ == minimumTime_) break; // first solution is enough or optimal solution is found
                 // continue to look for solutions with the narrower time bound until the termination condition is met
@@ -987,8 +984,8 @@ ob::State *SpaceTimeRRT::nextGoal(const ob::PlannerTerminationCondition &ptc, in
     return nullptr;
 }
 
-void SpaceTimeRRT::writeSamplesToCSV(const ob::PlannerData &data, int n) {
-    std::ofstream outfile ("data/cover_plot/" + std::to_string(n) + "_samples.csv");
+void SpaceTimeRRT::writeSamplesToCSV(const ob::PlannerData &data,  std::string filename) {
+    std::ofstream outfile ("data/cover_plot/" + filename);
     std::string delim = ",";
 
     outfile << "x" << delim << "time" << delim << "incoming edge" << delim << "outgoing edges" << delim << "tag\n";

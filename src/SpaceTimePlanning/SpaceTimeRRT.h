@@ -222,10 +222,13 @@ protected:
         }
 
         bool sample(ob::State *state) override {
-            bool validSample = false;
 
-            while (!validSample) {
+            double goalT = goalMotions_[0]->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+            double *goalValues = goalMotions_[0]->state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
+            for (int i = 0; i < maxTries_; ++i) {
                 internalSampler_->sampleUniform(state);
+                double stateT = state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position;
+                double *stateValues = state->as<ob::CompoundState>()->as<ob::RealVectorStateSpace::StateType>(0)->values;
                 double leftBound, rightBound;
                 // get minimum time, when the state can be reached from the start
                 double startBound = startMotion_->state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position +
@@ -270,10 +273,10 @@ protected:
                 if (leftBound <= rightBound) {
                     double time = rng_.uniformReal(leftBound, rightBound);
                     state->as<ob::CompoundState>()->as<ob::TimeStateSpace::StateType>(1)->position = time;
-                    validSample = true;
+                    return true;
                 }
             }
-            return true;
+            return false;
         }
 
         bool sampleNear(ob::State *state, const ob::State *near, const double distance) override {
@@ -293,6 +296,9 @@ protected:
 
         /** References to whether the old or new batch region is sampled */
         bool &sampleOldBatch_;
+
+        /** \brief Maximum tries to sample a new state, if no new state could be sampled, force a new goal sample. */
+        int maxTries_ = 10;
 
         /** \brief The random number generator */
         ompl::RNG rng_;
@@ -477,6 +483,8 @@ protected:
     /** \brief The random number generator */
     ompl::RNG rng_;
 
+    std::uint_fast32_t seed;
+
     std::chrono::time_point<std::chrono::steady_clock> startTime_;
     double timeToFirstSolution_ = std::numeric_limits<double>::infinity();
 
@@ -491,10 +499,10 @@ protected:
         return std::to_string(bestTime_);
     }
 
-    void writeSamplesToCSV(const ob::PlannerData &data, int n);
+    void writeSamplesToCSV(const ob::PlannerData &data, std::string filename);
     void writePathToCSV(const ob::PathPtr &path);
     std::vector<int> samplesToDraw_{
-        5, 10, 20, 50, 100, 250
+        20, 50, 100, 200, 250
     };
 
 };

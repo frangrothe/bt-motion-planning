@@ -11,21 +11,22 @@ TimeNDPlanner::TimeNDPlanner(int d) : startPosition_(d_, 0.0), goalPosition_(d_,
 
 og::SimpleSetup TimeNDPlanner::createSimpleSetup() {
     double distance = sqrt(d_); // distance between start (0, ..., 0) and goal (1, ..., 1)
-    double speed = distance * 0.2;
+    double speed = distance;
     auto vectorSpace = std::make_shared<ob::RealVectorStateSpace>(d_);
     auto space = std::make_shared<space_time::AnimationStateSpace>(vectorSpace, speed, timeWeight_);
 
     // Set the bounds for R1
     ob::RealVectorBounds bounds(d_);
-    bounds.setLow(0.0);
-    bounds.setHigh(1.01);
+    bounds.setLow(-2.0);
+    bounds.setHigh(2.0);
     vectorSpace->setBounds(bounds);
     // set time bound if initialized
     if (upperTimeBound_ > 0.0)
         space->setTimeBounds(0.0, upperTimeBound_);
 
     ob::SpaceInformationPtr si = std::make_shared<ob::SpaceInformation>(space);
-    si->setStateValidityChecker(std::make_shared<TimeNDStateValidityChecker>(si, d_, constraints_, bounds, agentRadius_));
+//    si->setStateValidityChecker(std::make_shared<TimeNDStateValidityChecker>(si, d_, constraints_, bounds, agentRadius_));
+    si->setStateValidityChecker(std::make_shared<TimeNDNarrowPassageValidityChecker>(si, bounds));
     si->setMotionValidator(std::make_shared<TimeNDMotionValidator>(si, d_, speed));
     og::SimpleSetup ss(si);
 
@@ -119,7 +120,7 @@ void TimeNDPlanner::benchmark() {
     }
     else {
         b.addPlannerAllocator(std::bind(&TimeNDPlanner::createRRTConnect, this, std::placeholders::_1));
-//        b.addPlannerAllocator(std::bind(&TimeNDPlanner::createRRTStar, this, std::placeholders::_1));
+        b.addPlannerAllocator(std::bind(&TimeNDPlanner::createRRTStar, this, std::placeholders::_1));
         b.setPostRunEvent(std::bind(&TimeNDPlanner::RecordBestCost, this, std::placeholders::_1, std::placeholders::_2));
     }
 
@@ -130,7 +131,7 @@ void TimeNDPlanner::benchmark() {
     ompl::tools::Benchmark::Request req;
     req.maxTime = solveTime_;
     req.maxMem = 4000.0;
-    req.runCount = 200;
+    req.runCount = 100;
     req.displayProgress = true;
     req.timeBetweenUpdates = 0.002; // in seconds
     b.benchmark(req);
@@ -138,7 +139,7 @@ void TimeNDPlanner::benchmark() {
     // This will generate a file of the form ompl_host_time.log
     std::ostringstream oss;
     std::string s = plannerType_ == SpaceTimeRRT ? "spacetime" : std::to_string(int(upperTimeBound_));
-    oss << "data/benchmarks/" << d_ << "/cost_" << s << ".log";
+    oss << "data/benchmarks/narrow" << d_ << "/n8_" << s << ".log";
     b.saveResultsToFile(oss.str().c_str());
 }
 
@@ -205,7 +206,6 @@ ompl::base::PlannerPtr TimeNDPlanner::createRRTStar(const ompl::base::SpaceInfor
 ompl::base::PlannerPtr TimeNDPlanner::createSpaceTimeRRT(const ompl::base::SpaceInformationPtr &si) {
     auto *spaceTimeRRT = new space_time::SpaceTimeRRT(si);
     spaceTimeRRT->setRange(plannerRangeFactor_ * sqrt(d_));
-    spaceTimeRRT->setRewiringToKNearest();
     spaceTimeRRT->setBatchSize(batchSize_);
     return ob::PlannerPtr (spaceTimeRRT);
 }

@@ -208,6 +208,7 @@ ompl::base::PlannerPtr Time1DPlanner::createRRTStar(const ompl::base::SpaceInfor
 ompl::base::PlannerPtr Time1DPlanner::createSpaceTimeRRT(const ompl::base::SpaceInformationPtr &si) {
     auto *spaceTimeRRT = new space_time::SpaceTimeRRT(si);
     spaceTimeRRT->setRange(plannerRange_);
+    spaceTimeRRT->setBatchSize(200);
     return ob::PlannerPtr (spaceTimeRRT);
 }
 

@@ -62,21 +62,21 @@ private:
     double xBoundLow_ = -2.0;
     double xBoundHigh_ = 2.0;
     double timeBoundLow_ = 0.0;
-    double timeBoundHigh_ = 2.0;
+    double timeBoundHigh_ = -2.0;
 
     double initialTimeBoundFactor_ = 2;
 
     double xStart_ = 0.0;
     std::vector<std::pair<double, double>> goalRegions_ = {
-            {1.0, 1.1},
-            {-1.1, -1.0}
+            {1.0, 1.001},
+            {-1.001, -1.0}
     };
 
     std::vector<Constraint> constraints_ {
-            {0.4, 0.6, 0.0, 0.6},
-            {0.4, 0.6, 0.9, 2.0},
-            {-0.8, -0.6, 1.5, 1.7},
-            {-0.4, -0.2, 0.401, 0.8}
+            {0.4, 0.6, 0.0, 2.4},
+            {0.4, 0.6, 3.0, 4.0},
+            {-0.8, -0.6, 2.6, 3.0},
+            {-0.4, -0.2, 0.401, 2.0}
     };
     double vMax_ = 1.0; // 1 m/s
     double timeWeight_ = 0.5; // compared to distance weight used in distance function. [0,1]
